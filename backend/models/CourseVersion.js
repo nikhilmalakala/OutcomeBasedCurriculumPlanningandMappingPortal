@@ -2,11 +2,9 @@ import mongoose from 'mongoose';
 
 const SyllabusUnitSchema = new mongoose.Schema({
   unitNumber: { type: Number, required: true },
-  title: { type: String, required: true },
-  description: { type: String },
-  topics: [{ type: String }],
-  outcomes: { type: String },
-  hours: { type: Number, default: 10 }
+  htmlContent: { type: String, default: '' },
+  plainText: { type: String, default: '' },
+  lastUpdated: { type: Date, default: Date.now }
 });
 
 const CourseOutcomeSchema = new mongoose.Schema({

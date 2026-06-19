@@ -13,6 +13,42 @@ import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Width
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import adityaLogo from '../../assets/aditya-logo.png';
+import { RichTextEditor } from '../../components/common/RichTextEditor';
+
+const escapeHtml = (value = ''): string => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const htmlToPlainText = (html = ''): string => String(html)
+  .replace(/<br\s*\/?>/gi, '\n')
+  .replace(/<\/(p|div|li|tr|h[1-6])>/gi, '\n')
+  .replace(/<[^>]+>/g, '')
+  .replace(/&nbsp;/g, ' ')
+  .replace(/&amp;/g, '&')
+  .replace(/&lt;/g, '<')
+  .replace(/&gt;/g, '>')
+  .replace(/&quot;/g, '"')
+  .replace(/&#39;/g, "'")
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
+
+const legacyUnitToHtml = (unit: any): string => {
+  const parts = [];
+  if (unit?.title) parts.push(`<p><strong>${escapeHtml(unit.title)}</strong></p>`);
+  if (unit?.description) parts.push(`<p>${escapeHtml(unit.description).replace(/\n/g, '<br>')}</p>`);
+  if (Array.isArray(unit?.topics) && unit.topics.some((topic: string) => topic?.trim())) {
+    parts.push(`<p><strong>Topics:</strong> ${escapeHtml(unit.topics.filter(Boolean).join(', '))}</p>`);
+  }
+  if (unit?.practice) parts.push(`<p><strong>Practice:</strong> ${escapeHtml(unit.practice).replace(/\n/g, '<br>')}</p>`);
+  return parts.join('');
+};
+
+const getUnitRichText = (unit: any): string => unit?.htmlContent || unit?.richTextContent || legacyUnitToHtml(unit);
+
+const hasUnitRichText = (unit: any): boolean => htmlToPlainText(getUnitRichText(unit)).length > 0;
 
 
 const formatTextbook = (t: any): string => {
@@ -170,7 +206,7 @@ export const HodSyllabusEditor: React.FC<HodSyllabusEditorProps> = ({ courseVers
     // 5. Exactly 5 Syllabus Units (Required)
     const unitCount = v.syllabusUnits?.length || 0;
     const exactly5Units = unitCount === 5;
-    const allUnitsFilled = unitCount > 0 && v.syllabusUnits.every((u: any) => u.title?.trim() && u.description?.trim() && typeof u.hours === 'number' && u.hours > 0);
+    const allUnitsFilled = unitCount > 0 && v.syllabusUnits.every((u: any) => hasUnitRichText(u));
     const syllabusPassed = exactly5Units && allUnitsFilled;
     let syllabusDetails = '';
     if (syllabusPassed) {
@@ -181,7 +217,7 @@ export const HodSyllabusEditor: React.FC<HodSyllabusEditorProps> = ({ courseVers
     } else {
       const incompleteUnits: number[] = [];
       v.syllabusUnits.forEach((u: any, idx: number) => {
-        if (!u.title?.trim() || !u.description?.trim() || typeof u.hours !== 'number' || u.hours <= 0) {
+        if (!hasUnitRichText(u)) {
           incompleteUnits.push(idx + 1);
         }
       });
@@ -836,28 +872,11 @@ export const HodSyllabusEditor: React.FC<HodSyllabusEditorProps> = ({ courseVers
                 <div key={u.unitNumber || idx} style={{ marginBottom: '12px' }}>
                   <div style={{ fontWeight: 700, marginBottom: '3px' }}>
                     UNIT – {romanNumerals[idx] || idx + 1}
-                    {u.hours ? <span style={{ fontWeight: 400, marginLeft: '6px', color: '#555' }}>({u.hours} Hours)</span> : null}
                   </div>
-                  <div style={{ marginBottom: u.practice ? '4px' : '0', display: 'block', width: '100%' }}>
-                    {u.title && (
-                      <div style={{ fontWeight: 700, marginBottom: '2px' }}>{u.title}:</div>
-                    )}
-                    <div style={{ textAlign: 'justify' }}>
-                      {u.description || 'Unit syllabus content not yet drafted.'}
-                    </div>
-                  </div>
-                  {u.topics && u.topics.length > 0 && u.topics.some((t: string) => t.trim()) && (
-                    <div style={{ marginBottom: '4px', display: 'block', width: '100%' }}>
-                      <span style={{ fontWeight: 700 }}>Topics: </span>
-                      <span>{u.topics.filter((t: string) => t.trim()).join(', ')}</span>
-                    </div>
-                  )}
-                  {u.practice && u.practice.trim() && (
-                    <div style={{ marginTop: '6px', display: 'block', width: '100%' }}>
-                      <div style={{ fontWeight: 700, display: 'block', width: '100%', marginBottom: '2px' }}>Practice:</div>
-                      <div style={{ display: 'block', width: '100%', textAlign: 'justify', paddingLeft: '0', whiteSpace: 'pre-wrap' }}>{u.practice}</div>
-                    </div>
-                  )}
+                  <div 
+                    style={{ textAlign: 'justify' }}
+                    dangerouslySetInnerHTML={{ __html: getUnitRichText(u) }}
+                  />
                 </div>
               );
             })}
@@ -1236,11 +1255,8 @@ export const HodSyllabusEditor: React.FC<HodSyllabusEditorProps> = ({ courseVers
     const nextNum = units.length + 1;
     units.push({
       unitNumber: nextNum,
-      title: '',
-      description: '',
-      topics: [''],
-      outcomes: '',
-      hours: 10
+      htmlContent: '',
+      plainText: '',
     });
     setActiveVersion({ ...activeVersion, syllabusUnits: units });
   };
@@ -2119,55 +2135,26 @@ export const HodSyllabusEditor: React.FC<HodSyllabusEditorProps> = ({ courseVers
 
                             <div className="flex justify-between items-center pr-10">
                               <span className="font-extrabold text-blue-850">UNIT {unit.unitNumber}</span>
-                              <div className="flex items-center gap-1.5 font-bold">
-                                <span>Class Hours:</span>
-                                <input 
-                                  type="number" 
-                                  value={unit.hours} 
-                                  onChange={(e) => updateUnitField(idx, 'hours', parseInt(e.target.value) || 0)}
-                                  className="w-10 text-center border rounded p-1 font-bold font-mono text-slate-700" 
-                                />
-                              </div>
                             </div>
 
                             <div className="space-y-3 font-bold text-slate-500">
                               <div className="space-y-1">
-                                <span>Unit Title *</span>
-                                <input 
-                                  type="text" 
-                                  value={unit.title}
-                                  onChange={(e) => updateUnitField(idx, 'title', e.target.value)}
-                                  className="w-full border border-slate-350 rounded-lg p-2 text-slate-700 font-semibold outline-none focus:ring-1 focus:ring-blue-600 bg-white" 
-                                  placeholder="e.g. Relational Query Optimization"
+                                <label className="text-xs uppercase tracking-wide">Unit Content (Paste Syllabus here)</label>
+                                <RichTextEditor
+                                  value={getUnitRichText(unit)}
+                                  onChange={(html) => {
+                                    const plainText = new DOMParser().parseFromString(html, 'text/html').body.textContent || '';
+                                    const units = [...activeVersion.syllabusUnits];
+                                    units[idx] = {
+                                      ...units[idx],
+                                      htmlContent: html,
+                                      plainText: plainText,
+                                      lastUpdated: new Date().toISOString()
+                                    };
+                                    setActiveVersion({ ...activeVersion, syllabusUnits: units });
+                                  }}
+                                  minHeight={250}
                                 />
-                              </div>
-                              <div className="space-y-1">
-                                <span>Unit Description *</span>
-                                <textarea 
-                                  rows={3} 
-                                  value={unit.description}
-                                  onChange={(e) => updateUnitField(idx, 'description', e.target.value)}
-                                  className="w-full border border-slate-350 rounded-lg p-2.5 text-slate-750 font-semibold outline-none focus:ring-1 focus:ring-blue-600 bg-white" 
-                                  placeholder="Explain core unit topics and definitions..."
-                                />
-                                <span className="text-[9px] text-slate-400 block text-right font-mono font-medium">
-                                  {unit.description?.length || 0} / 1000 characters
-                                </span>
-                              </div>
-
-                              {/* Practice block */}
-                              <div className="space-y-1">
-                                <span>Practice</span>
-                                <textarea
-                                  rows={3}
-                                  value={unit.practice || ''}
-                                  onChange={(e) => updateUnitField(idx, 'practice', e.target.value)}
-                                  className="w-full border border-slate-350 rounded-lg p-2.5 text-slate-755 font-semibold outline-none focus:ring-1 focus:ring-blue-600 bg-white"
-                                  placeholder="e.g. Practice problems, exercises, or activities for this unit..."
-                                />
-                                <span className="text-[9px] text-slate-400 block text-right font-mono font-medium">
-                                  {unit.practice?.length || 0} / 1000 characters
-                                </span>
                               </div>
                             </div>
                           </div>

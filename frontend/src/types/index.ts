@@ -13,6 +13,14 @@ export interface Program {
   name: string;
   code: string;
   description?: string;
+  curriculumBookTemplate?: {
+    coverTitle?: string;
+    coverSubtitle?: string;
+    coverNote?: string;
+    headerText?: string;
+    footerText?: string;
+    watermarkText?: string;
+  };
 }
 
 export interface Department {
@@ -32,6 +40,15 @@ export interface Regulation {
   durationYears: number;
   semesterCount: number;
   isActive: boolean;
+  curriculumLayout?: {
+    coverTitle?: string;
+    coverSubtitle?: string;
+    headerText?: string;
+    footerText?: string;
+    watermarkText?: string;
+    pageBorderStyle?: 'classic' | 'minimal' | 'none';
+    accentColor?: string;
+  };
 }
 
 export interface Course {
@@ -43,11 +60,14 @@ export interface Course {
 
 export interface SyllabusUnit {
   unitNumber: number;
-  title: string;
+  htmlContent?: string;
+  plainText?: string;
+  lastUpdated?: string;
+  title?: string;
   description?: string;
-  topics: string[];
+  topics?: string[];
   outcomes?: string;
-  hours: number;
+  hours?: number;
 }
 
 export interface CourseOutcome {

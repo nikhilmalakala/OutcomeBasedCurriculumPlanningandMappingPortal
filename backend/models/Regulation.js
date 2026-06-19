@@ -8,6 +8,17 @@ const RegulationSchema = new mongoose.Schema({
   semesterCount: { type: Number, required: true, default: 8 }, // Number of semesters
   status: { type: String, enum: ['Draft', 'Published', 'Archived'], default: 'Draft' },
   version: { type: Number, default: 1 },
+  // CODEx-added start: Stores regulation-specific curriculum book layout overrides.
+  curriculumLayout: {
+    coverTitle: { type: String, default: '' },
+    coverSubtitle: { type: String, default: '' },
+    headerText: { type: String, default: '' },
+    footerText: { type: String, default: '' },
+    watermarkText: { type: String, default: '' },
+    pageBorderStyle: { type: String, enum: ['classic', 'minimal', 'none'], default: 'classic' },
+    accentColor: { type: String, default: '#1d4ed8' }
+  },
+  // CODEx-added end
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 

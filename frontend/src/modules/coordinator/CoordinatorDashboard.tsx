@@ -13,6 +13,7 @@ import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Width
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import adityaLogo from '../../assets/aditya-logo.png';
+import { RichTextEditor } from '../../components/common/RichTextEditor';
 
 
 const formatTextbook = (t: any): string => {
@@ -34,6 +35,41 @@ const formatOnlineResource = (r: any): string => {
   }
   return '';
 };
+
+const escapeHtml = (value = ''): string => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const htmlToPlainText = (html = ''): string => String(html)
+  .replace(/<br\s*\/?>/gi, '\n')
+  .replace(/<\/(p|div|li|tr|h[1-6])>/gi, '\n')
+  .replace(/<[^>]+>/g, '')
+  .replace(/&nbsp;/g, ' ')
+  .replace(/&amp;/g, '&')
+  .replace(/&lt;/g, '<')
+  .replace(/&gt;/g, '>')
+  .replace(/&quot;/g, '"')
+  .replace(/&#39;/g, "'")
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
+
+const legacyUnitToHtml = (unit: any): string => {
+  const parts = [];
+  if (unit?.title) parts.push(`<p><strong>${escapeHtml(unit.title)}</strong></p>`);
+  if (unit?.description) parts.push(`<p>${escapeHtml(unit.description).replace(/\n/g, '<br>')}</p>`);
+  if (Array.isArray(unit?.topics) && unit.topics.some((topic: string) => topic?.trim())) {
+    parts.push(`<p><strong>Topics:</strong> ${escapeHtml(unit.topics.filter(Boolean).join(', '))}</p>`);
+  }
+  if (unit?.practice) parts.push(`<p><strong>Practice:</strong> ${escapeHtml(unit.practice).replace(/\n/g, '<br>')}</p>`);
+  return parts.join('');
+};
+
+const getUnitRichText = (unit: any): string => unit?.htmlContent || unit?.richTextContent || legacyUnitToHtml(unit);
+
+const hasUnitRichText = (unit: any): boolean => htmlToPlainText(getUnitRichText(unit)).length > 0;
 
 interface CoordinatorDashboardProps {
   activeTab: string;
@@ -169,7 +205,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
     // 5. Exactly 5 Syllabus Units (Required)
     const unitCount = v.syllabusUnits?.length || 0;
     const exactly5Units = unitCount === 5;
-    const allUnitsFilled = unitCount > 0 && v.syllabusUnits.every((u: any) => u.title?.trim() && u.description?.trim() && typeof u.hours === 'number' && u.hours > 0);
+    const allUnitsFilled = unitCount > 0 && v.syllabusUnits.every((u: any) => hasUnitRichText(u));
     const syllabusPassed = exactly5Units && allUnitsFilled;
     let syllabusDetails = '';
     if (syllabusPassed) {
@@ -180,7 +216,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
     } else {
       const incompleteUnits: number[] = [];
       v.syllabusUnits.forEach((u: any, idx: number) => {
-        if (!u.title?.trim() || !u.description?.trim() || typeof u.hours !== 'number' || u.hours <= 0) {
+        if (!hasUnitRichText(u)) {
           incompleteUnits.push(idx + 1);
         }
       });
@@ -603,27 +639,25 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
               new Paragraph({ children: [] }),
               new Paragraph({ children: [new TextRun({ text: 'Syllabus Units', bold: true })] }),
               ...(activeVersion.syllabusUnits || []).flatMap((unit: any, idx: number) => [
-                new Paragraph({ children: [new TextRun({ text: `Unit ${idx + 1} - ${unit.title || 'Untitled'} (${unit.hours || 10} Hours)`, bold: true })] }),
-                new Paragraph({ children: [new TextRun({ text: unit.description || 'No description provided.' })] }),
-                ...(unit.topics?.length > 0 ? [new Paragraph({ children: [new TextRun({ text: `Topics: ${unit.topics.join(', ')}`, italics: true })] })] : []),
-                ...(unit.practice ? [new Paragraph({ children: [new TextRun({ text: `Practice: ${unit.practice}` })] })] : []),
+                new Paragraph({ children: [new TextRun({ text: `UNIT - ${idx + 1}`, bold: true })] }),
+                new Paragraph({ children: [new TextRun({ text: htmlToPlainText(getUnitRichText(unit)) || 'No syllabus content provided.' })] }),
                 new Paragraph({ children: [] })
               ]),
               new Paragraph({ children: [] }),
 
               ...(activeVersion.textbooks?.filter((ref: any) => formatTextbook(ref).trim()).length > 0 ? [
                 new Paragraph({ children: [new TextRun({ text: 'Prescribed Textbooks', bold: true })] }),
-                ...activeVersion.textbooks.filter((ref: any) => formatTextbook(ref).trim()).map((ref: any) => new Paragraph({ children: [new TextRun({ text: `• ${formatTextbook(ref)}` })] })),
+                ...(activeVersion.textbooks || []).filter((ref: any) => formatTextbook(ref).trim()).map((ref: any) => new Paragraph({ children: [new TextRun({ text: `• ${formatTextbook(ref)}` })] })),
                 new Paragraph({ children: [] })
               ] : []),
               ...(activeVersion.referenceMaterials?.filter((ref: any) => formatTextbook(ref).trim()).length > 0 ? [
                 new Paragraph({ children: [new TextRun({ text: 'Reference Books', bold: true })] }),
-                ...activeVersion.referenceMaterials.filter((ref: any) => formatTextbook(ref).trim()).map((ref: any) => new Paragraph({ children: [new TextRun({ text: `• ${formatTextbook(ref)}` })] })),
+                ...(activeVersion.referenceMaterials || []).filter((ref: any) => formatTextbook(ref).trim()).map((ref: any) => new Paragraph({ children: [new TextRun({ text: `• ${formatTextbook(ref)}` })] })),
                 new Paragraph({ children: [] })
               ] : []),
               ...(activeVersion.onlineResources?.filter((ref: any) => formatOnlineResource(ref).trim()).length > 0 ? [
                 new Paragraph({ children: [new TextRun({ text: 'Web Links / Online Resources', bold: true })] }),
-                ...activeVersion.onlineResources.filter((ref: any) => formatOnlineResource(ref).trim()).map((ref: any) => new Paragraph({ children: [new TextRun({ text: `• ${formatOnlineResource(ref)}` })] })),
+                ...(activeVersion.onlineResources || []).filter((ref: any) => formatOnlineResource(ref).trim()).map((ref: any) => new Paragraph({ children: [new TextRun({ text: `• ${formatOnlineResource(ref)}` })] })),
                 new Paragraph({ children: [] })
               ] : []),
               new Paragraph({ children: [new TextRun({ text: 'Assessment Pattern (CIE / SEE)', bold: true })] }),
@@ -738,7 +772,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
             <div style={{ fontWeight: 700, marginBottom: '4px' }}>At the end of the course, student will be able to:</div>
             <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '10px' }}>
               <tbody>
-                {activeVersion.courseOutcomes.map((co: any) => (
+                {(activeVersion.courseOutcomes || []).map((co: any) => (
                   <tr key={co.coCode}>
                     <td style={{ padding: '1px 6px 1px 12px', fontWeight: 700, whiteSpace: 'nowrap', width: '36px', verticalAlign: 'top' }}>
                       {co.coCode}:
@@ -768,7 +802,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
                 </tr>
               </thead>
               <tbody>
-                {activeVersion.courseOutcomes.map((co: any) => {
+                {(activeVersion.courseOutcomes || []).map((co: any) => {
                   const coPo = activeVersion.coPoMappings?.find((m: any) => m.coCode === co.coCode);
                   return (
                     <tr key={co.coCode}>
@@ -804,7 +838,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
                 </tr>
               </thead>
               <tbody>
-                {activeVersion.courseOutcomes.map((co: any) => {
+                {(activeVersion.courseOutcomes || []).map((co: any) => {
                   const coPso = activeVersion.coPsoMappings?.find((m: any) => m.coCode === co.coCode);
                   return (
                     <tr key={co.coCode}>
@@ -829,34 +863,17 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
 
         {activeVersion.syllabusUnits && activeVersion.syllabusUnits.length > 0 && (
           <div style={{ marginBottom: '12px' }}>
-            {activeVersion.syllabusUnits.map((u: any, idx: number) => {
+            {(activeVersion.syllabusUnits || []).map((u: any, idx: number) => {
               const romanNumerals = ['I','II','III','IV','V','VI','VII','VIII'];
               return (
                 <div key={u.unitNumber || idx} style={{ marginBottom: '12px' }}>
                   <div style={{ fontWeight: 700, marginBottom: '3px' }}>
                     UNIT – {romanNumerals[idx] || idx + 1}
-                    {u.hours ? <span style={{ fontWeight: 400, marginLeft: '6px', color: '#555' }}>({u.hours} Hours)</span> : null}
                   </div>
-                  <div style={{ marginBottom: u.practice ? '4px' : '0', display: 'block', width: '100%' }}>
-                    {u.title && (
-                      <div style={{ fontWeight: 700, marginBottom: '2px' }}>{u.title}:</div>
-                    )}
-                    <div style={{ textAlign: 'justify' }}>
-                      {u.description || 'Unit syllabus content not yet drafted.'}
-                    </div>
-                  </div>
-                  {u.topics && u.topics.length > 0 && u.topics.some((t: string) => t.trim()) && (
-                    <div style={{ marginBottom: '4px', display: 'block', width: '100%' }}>
-                      <span style={{ fontWeight: 700 }}>Topics: </span>
-                      <span>{u.topics.filter((t: string) => t.trim()).join(', ')}</span>
-                    </div>
-                  )}
-                  {u.practice && u.practice.trim() && (
-                    <div style={{ marginTop: '6px', display: 'block', width: '100%' }}>
-                      <div style={{ fontWeight: 700, display: 'block', width: '100%', marginBottom: '2px' }}>Practice:</div>
-                      <div style={{ display: 'block', width: '100%', textAlign: 'justify', paddingLeft: '0', whiteSpace: 'pre-wrap' }}>{u.practice}</div>
-                    </div>
-                  )}
+                  <div 
+                    style={{ textAlign: 'justify' }}
+                    dangerouslySetInnerHTML={{ __html: getUnitRichText(u) }}
+                  />
                 </div>
               );
             })}
@@ -865,11 +882,11 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
 
 
 
-        {activeVersion.textbooks && activeVersion.textbooks.filter((t: any) => formatTextbook(t).trim()).length > 0 && (
+        {activeVersion.textbooks && (activeVersion.textbooks || []).filter((t: any) => formatTextbook(t).trim()).length > 0 && (
           <div style={{ marginBottom: '10px' }}>
             <div style={{ fontWeight: 700, marginBottom: '3px' }}>Text Books:</div>
             <div style={{ margin: 0, paddingLeft: '24px' }}>
-              {activeVersion.textbooks.filter((t: any) => formatTextbook(t).trim()).map((bVal: any, i: number) => {
+              {(activeVersion.textbooks || []).filter((t: any) => formatTextbook(t).trim()).map((bVal: any, i: number) => {
                 const book = formatTextbook(bVal);
                 const commaIdx = book.indexOf(',');
                 if (commaIdx !== -1) {
@@ -890,11 +907,11 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
           </div>
         )}
 
-        {activeVersion.referenceMaterials && activeVersion.referenceMaterials.filter((r: any) => formatTextbook(r).trim()).length > 0 && (
+        {activeVersion.referenceMaterials && (activeVersion.referenceMaterials || []).filter((r: any) => formatTextbook(r).trim()).length > 0 && (
           <div style={{ marginBottom: '10px' }}>
             <div style={{ fontWeight: 700, marginBottom: '3px' }}>Reference Books:</div>
             <div style={{ margin: 0, paddingLeft: '24px' }}>
-              {activeVersion.referenceMaterials.filter((r: any) => formatTextbook(r).trim()).map((bVal: any, i: number) => {
+              {(activeVersion.referenceMaterials || []).filter((r: any) => formatTextbook(r).trim()).map((bVal: any, i: number) => {
                 const book = formatTextbook(bVal);
                 const commaIdx = book.indexOf(',');
                 if (commaIdx !== -1) {
@@ -915,11 +932,11 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
           </div>
         )}
 
-        {activeVersion.onlineResources && activeVersion.onlineResources.filter((w: any) => formatOnlineResource(w).trim()).length > 0 && (
+        {activeVersion.onlineResources && (activeVersion.onlineResources || []).filter((w: any) => formatOnlineResource(w).trim()).length > 0 && (
           <div style={{ marginBottom: '12px' }}>
             <div style={{ fontWeight: 700, marginBottom: '3px' }}>Web Links:</div>
             <ol style={{ margin: 0, paddingLeft: '18px' }}>
-              {activeVersion.onlineResources.filter((w: any) => formatOnlineResource(w).trim()).map((link: any, i: number) => (
+              {(activeVersion.onlineResources || []).filter((w: any) => formatOnlineResource(w).trim()).map((link: any, i: number) => (
                 <li key={i} style={{ marginBottom: '2px', wordBreak: 'break-all' }}>{formatOnlineResource(link)}</li>
               ))}
             </ol>
@@ -1481,11 +1498,8 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
     const nextNum = units.length + 1;
     units.push({
       unitNumber: nextNum,
-      title: '',
-      description: '',
-      topics: [''],
-      outcomes: '',
-      hours: 10
+      htmlContent: '',
+      plainText: '',
     });
     setActiveVersion({ ...activeVersion, syllabusUnits: units });
   };
@@ -1526,7 +1540,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
 
   const handleRemoveTextbook = (idx: number) => {
     if (!activeVersion) return;
-    const textbooks = activeVersion.textbooks.filter((_: any, i: number) => i !== idx);
+    const textbooks = (activeVersion.textbooks || []).filter((_: any, i: number) => i !== idx);
     const updatedVersion = { ...activeVersion, textbooks };
     setActiveVersion(updatedVersion);
     saveDraftAutomatically(updatedVersion);
@@ -1543,7 +1557,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
 
   const handleRemoveReference = (idx: number) => {
     if (!activeVersion) return;
-    const referenceMaterials = activeVersion.referenceMaterials.filter((_: any, i: number) => i !== idx);
+    const referenceMaterials = (activeVersion.referenceMaterials || []).filter((_: any, i: number) => i !== idx);
     const updatedVersion = { ...activeVersion, referenceMaterials };
     setActiveVersion(updatedVersion);
     saveDraftAutomatically(updatedVersion);
@@ -1669,7 +1683,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
     const unitCount = activeVersion.syllabusUnits?.length || 0;
     let completeCount = 0;
     activeVersion.syllabusUnits?.forEach((u: any) => {
-      if (u.title.trim() && u.description.trim()) completeCount++;
+      if ((u?.title?.trim?.() && u?.description?.trim?.()) || hasUnitRichText(u)) completeCount++;
     });
     return Math.min(Math.round((completeCount / 5) * 100), 100);
   };
@@ -2236,7 +2250,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {(activeVersion.offeredFor || []).length > 0 ? (
-                    activeVersion.offeredFor.map((branch: string) => (
+                    (activeVersion.offeredFor || []).map((branch: string) => (
                       <span key={branch} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
                         {branch}
                       </span>
@@ -2744,68 +2758,26 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
 
                             <div className="flex justify-between items-center pr-10">
                               <span className="font-extrabold text-blue-850">UNIT {unit.unitNumber}</span>
-                              <div className="flex items-center gap-1.5 font-bold">
-                                <span>Class Hours:</span>
-                                <input 
-                                  type="number" 
-                                  value={unit.hours} 
-                                  onChange={(e) => updateUnitField(idx, 'hours', parseInt(e.target.value) || 0)}
-                                  className="w-10 text-center border rounded p-1 font-bold font-mono text-slate-700" 
-                                />
-                              </div>
                             </div>
 
                             <div className="space-y-3 font-bold text-slate-500">
                               <div className="space-y-1">
-                                <span>Unit Title *</span>
-                                <input 
-                                  type="text" 
-                                  value={unit.title}
-                                  onChange={(e) => updateUnitField(idx, 'title', e.target.value)}
-                                  className="w-full border border-slate-350 rounded-lg p-2 text-slate-700 font-semibold outline-none focus:ring-1 focus:ring-blue-600 bg-white" 
-                                  placeholder="e.g. Relational Query Optimization"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <span>Unit Topics (Comma-separated) *</span>
-                                <input 
-                                  type="text" 
-                                  value={Array.isArray(unit.topics) ? unit.topics.join(', ') : ''}
-                                  onChange={(e) => {
-                                    const arrayVal = e.target.value.split(',').map(s => s.trim());
-                                    updateUnitField(idx, 'topics', arrayVal);
+                                <label className="text-xs uppercase tracking-wide">Unit Content (Paste Syllabus here)</label>
+                                <RichTextEditor
+                                  value={getUnitRichText(unit)}
+                                  onChange={(html) => {
+                                    const plainText = new DOMParser().parseFromString(html, 'text/html').body.textContent || '';
+                                    const units = [...activeVersion.syllabusUnits];
+                                    units[idx] = {
+                                      ...units[idx],
+                                      htmlContent: html,
+                                      plainText: plainText,
+                                      lastUpdated: new Date().toISOString()
+                                    };
+                                    setActiveVersion({ ...activeVersion, syllabusUnits: units });
                                   }}
-                                  className="w-full border border-slate-355 rounded-lg p-2 text-slate-700 font-semibold outline-none focus:ring-1 focus:ring-blue-600 bg-white" 
-                                  placeholder="e.g. Transaction states, ACID properties, Concurrent execution"
+                                  minHeight={250}
                                 />
-                              </div>
-                              <div className="space-y-1">
-                                <span>Unit Description *</span>
-                                <textarea 
-                                  rows={3} 
-                                  value={unit.description}
-                                  onChange={(e) => updateUnitField(idx, 'description', e.target.value)}
-                                  className="w-full border border-slate-350 rounded-lg p-2.5 text-slate-750 font-semibold outline-none focus:ring-1 focus:ring-blue-600 bg-white" 
-                                  placeholder="Explain core unit topics and definitions..."
-                                />
-                                <span className="text-[9px] text-slate-400 block text-right font-mono font-medium">
-                                  {unit.description?.length || 0} / 1000 characters
-                                </span>
-                              </div>
-
-                              {/* Practice block */}
-                              <div className="space-y-1">
-                                <span>Practice</span>
-                                <textarea
-                                  rows={3}
-                                  value={unit.practice || ''}
-                                  onChange={(e) => updateUnitField(idx, 'practice', e.target.value)}
-                                  className="w-full border border-slate-350 rounded-lg p-2.5 text-slate-755 font-semibold outline-none focus:ring-1 focus:ring-blue-600 bg-white"
-                                  placeholder="e.g. Practice problems, exercises, or activities for this unit..."
-                                />
-                                <span className="text-[9px] text-slate-400 block text-right font-mono font-medium">
-                                  {unit.practice?.length || 0} / 1000 characters
-                                </span>
                               </div>
                             </div>
                           </div>
@@ -2959,7 +2931,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
                               No prescribed textbooks added yet.
                             </div>
                           ) : (
-                            activeVersion.textbooks.map((txt: any, idx: number) => (
+                            (activeVersion.textbooks || []).map((txt: any, idx: number) => (
                               <div key={idx} className="flex justify-between items-center p-2 rounded-xl bg-slate-50 border border-slate-200">
                                 <span className="text-slate-750 font-semibold">{formatTextbook(txt)}</span>
                                 <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -2993,7 +2965,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
                               No reference books added yet.
                             </div>
                           ) : (
-                            activeVersion.referenceMaterials.map((txt: any, idx: number) => (
+                            (activeVersion.referenceMaterials || []).map((txt: any, idx: number) => (
                               <div key={idx} className="flex justify-between items-center p-2 rounded-xl bg-slate-50 border border-slate-200">
                                 <span className="text-slate-755 font-semibold">{formatTextbook(txt)}</span>
                                 <div className="flex items-center gap-1.5 flex-shrink-0">

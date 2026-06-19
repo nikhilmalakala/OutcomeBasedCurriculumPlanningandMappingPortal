@@ -241,5 +241,20 @@ export const api = {
     create: (body: any) => apiRequest('/api/course-assignments', { method: 'POST', body: JSON.stringify(body) }),
     update: (id: string, body: any) => apiRequest(`/api/course-assignments/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     delete: (id: string) => apiRequest(`/api/course-assignments/${id}`, { method: 'DELETE' })
+  },
+  curriculumBooks: {
+    list: (params: any = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return apiRequest(`/api/curriculum-books/list?${qs}`);
+    },
+    get: (id: string) => apiRequest(`/api/curriculum-books/${id}`),
+    upload: (formData: FormData) => apiRequest('/api/curriculum-books/upload', { method: 'POST', body: formData }),
+    update: (id: string, body: any) => apiRequest(`/api/curriculum-books/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    updateStatus: (id: string, status: 'Draft' | 'Published' | 'Archived') => apiRequest(`/api/curriculum-books/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
+    delete: (id: string) => apiRequest(`/api/curriculum-books/${id}`, { method: 'DELETE' }),
+    versionHistory: (bookId: string) => apiRequest(`/api/curriculum-books/version/history?curriculumBookId=${bookId}`),
+    createVersion: (body: any) => apiRequest('/api/curriculum-books/version/create', { method: 'POST', body: JSON.stringify(body) }),
+    restoreVersion: (bookId: string, versionId: string) => apiRequest(`/api/curriculum-books/${bookId}/versions/${versionId}/restore`, { method: 'POST' }),
+    exportPdf: (body: any) => apiRequest('/api/curriculum-books/export/pdf', { method: 'POST', body: JSON.stringify(body) })
   }
 };

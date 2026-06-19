@@ -16,6 +16,7 @@ import Papa from 'papaparse';
 import CurriculumBuilder from './CurriculumBuilder';
 import { HodSyllabusEditor } from './HodSyllabusEditor';
 import { CurriculumBookGenerator } from '../../components/common/CurriculumBookGenerator';
+import { CurriculumBookManager } from './CurriculumBookManager/CurriculumBookManager';
 
 
 export const HodDashboard: React.FC<{ activeTab: string; setActiveTab: (tab: string) => void }> = ({ activeTab, setActiveTab }) => {
@@ -732,11 +733,17 @@ export const HodDashboard: React.FC<{ activeTab: string; setActiveTab: (tab: str
         <div>
           <h1 className="text-xl font-extrabold text-slate-800">{selectedDepartment?.name || 'Computer Science and Engineering'}</h1>
           <p className="text-xs text-slate-500 mt-1 font-semibold">
-            AY 2025-2026 • {selectedRegulation?.code || 'R2025'} Regulation context
+            AY {new Date().getFullYear()}-{new Date().getFullYear() + 1} • {selectedRegulation?.code || 'R2025'} Regulation context
           </p>
         </div>
         <div className="flex gap-2">
-
+          <button 
+            onClick={() => setActiveTab('curriculum-book')}
+            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-bold transition-all border shadow-sm ${activeTab === 'curriculum-book' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'}`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Curriculum Book</span>
+          </button>
         </div>
       </div>
 
@@ -3211,6 +3218,13 @@ export const HodDashboard: React.FC<{ activeTab: string; setActiveTab: (tab: str
             </form>
           </div>
         </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* CURRICULUM BOOK MANAGER SUBPAGE */}
+      {/* ============================================================== */}
+      {activeTab === 'curriculum-book' && (
+        <CurriculumBookManager />
       )}
 
     </div>

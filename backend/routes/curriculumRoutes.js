@@ -10,3 +10,4 @@ router.get('/:regulationId/semester/:semester', curriculumController.getSemester
 router.get('/:regulationId', curriculumController.getCurriculumByRegulation);
 
 export default router;
+

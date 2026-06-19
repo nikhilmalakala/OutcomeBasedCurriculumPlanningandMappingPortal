@@ -18,6 +18,7 @@ import peoPsoRoutes from './routes/peoPsoRoutes.js';
 import peoRoutes from './routes/peoRoutes.js';
 import psoRoutes from './routes/psoRoutes.js';
 import curriculumRoutes from './routes/curriculumRoutes.js';
+import curriculumBookRoutes from './routes/curriculumBookRoutes.js';
 import minorStreamRoutes from './routes/minorStreamRoutes.js';
 import prerequisiteRoutes from './routes/prerequisiteRoutes.js';
 import courseAssignmentRoutes from './routes/courseAssignmentRoutes.js';
@@ -76,9 +77,14 @@ app.use('/api/peo-pso', peoPsoRoutes);
 app.use('/api/peos', peoRoutes);
 app.use('/api/psos', psoRoutes);
 app.use('/api/curriculum', curriculumRoutes);
+app.use('/api/curriculum-books', curriculumBookRoutes);
 app.use('/api/minor-streams', minorStreamRoutes);
 app.use('/api/prerequisites', prerequisiteRoutes);
 app.use('/api/course-assignments', courseAssignmentRoutes);
+
+// Static file serving
+import path from 'path';
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // 404 Route handler
 app.use((req, res, next) => {

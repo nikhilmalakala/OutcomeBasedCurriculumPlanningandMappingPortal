@@ -153,3 +153,74 @@ export const getSemesterCourses = async (req, res, next) => {
     return next(error);
   }
 };
+// CODEx-added start: API to get book layout configuration for a regulation.
+export const getBookLayoutConfig = async (req, res, next) => {
+  try {
+    const { regulationId } = req.params;
+    const regulation = await Regulation.findById(regulationId).populate('programId');
+    if (!regulation) {
+      return res.status(404).json({ message: 'Regulation not found.' });
+    }
+    const program = regulation.programId;
+
+    // Merge program-level defaults with regulation-specific overrides (regulation wins)
+    const layout = {
+      coverTitle: regulation.curriculumLayout?.coverTitle || program.curriculumBookTemplate?.coverTitle || 'Curriculum',
+      coverSubtitle: regulation.curriculumLayout?.coverSubtitle || program.curriculumBookTemplate?.coverSubtitle || '',
+      coverNote: regulation.curriculumLayout?.coverNote || program.curriculumBookTemplate?.coverNote || '',
+      headerText: regulation.curriculumLayout?.headerText || program.curriculumBookTemplate?.headerText || '',
+      footerText: regulation.curriculumLayout?.footerText || program.curriculumBookTemplate?.footerText || '',
+      watermarkText: regulation.curriculumLayout?.watermarkText || program.curriculumBookTemplate?.watermarkText || '',
+      pageBorderStyle: regulation.curriculumLayout?.pageBorderStyle || 'classic',
+      accentColor: regulation.curriculumLayout?.accentColor || '#1d4ed8'
+    };
+
+    return res.status(200).json({
+      regulation: { code: regulation.code, academicYear: regulation.academicYear },
+      program: { name: program.name, code: program.code },
+      layout
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+// CODEx-added end
+
+// CODEx-added start: API to save book layout configuration for a regulation.
+export const saveBookLayoutConfig = async (req, res, next) => {
+  try {
+    const { regulationId } = req.params;
+    const updates = req.body;
+
+    const regulation = await Regulation.findByIdAndUpdate(
+      regulationId,
+      {
+        $set: {
+          curriculumLayout: {
+            coverTitle: updates.coverTitle,
+            coverSubtitle: updates.coverSubtitle,
+            coverNote: updates.coverNote,
+            headerText: updates.headerText,
+            footerText: updates.footerText,
+            watermarkText: updates.watermarkText,
+            pageBorderStyle: updates.pageBorderStyle,
+            accentColor: updates.accentColor
+          }
+        }
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!regulation) {
+      return res.status(404).json({ message: 'Regulation not found.' });
+    }
+
+    return res.status(200).json({
+      message: 'Curriculum book layout saved successfully.',
+      layout: regulation.curriculumLayout
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+// CODEx-added end

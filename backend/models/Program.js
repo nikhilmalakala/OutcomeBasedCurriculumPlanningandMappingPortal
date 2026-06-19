@@ -10,6 +10,16 @@ const ProgramSchema = new mongoose.Schema({
   totalCredits: { type: Number, default: 160 },
   vision: { type: String, default: '' },
   mission: { type: String, default: '' },
+  // CODEx-added start: Stores program-wide curriculum book branding applied to every regulation under this program.
+  curriculumBookTemplate: {
+    coverTitle: { type: String, default: '' },
+    coverSubtitle: { type: String, default: '' },
+    coverNote: { type: String, default: '' },
+    headerText: { type: String, default: '' },
+    footerText: { type: String, default: '' },
+    watermarkText: { type: String, default: '' }
+  },
+  // CODEx-added end
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 

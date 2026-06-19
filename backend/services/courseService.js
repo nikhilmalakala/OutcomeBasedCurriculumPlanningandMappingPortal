@@ -1,7 +1,82 @@
 import * as courseRepository from '../repositories/courseRepository.js';
 import AuditLog from '../models/AuditLog.js';
 import User from '../models/User.js';
+import SyllabusUnit from '../models/SyllabusUnit.js';
 import { createNotification } from './notificationService.js';
+
+const stripUnsafeHtml = (value = '') => String(value)
+  .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+  .replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '')
+  .replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '')
+  .replace(/\s(href|src)\s*=\s*"javascript:[^"]*"/gi, ' $1="#"')
+  .replace(/\s(href|src)\s*=\s*'javascript:[^']*'/gi, " $1='#'");
+
+const escapeHtml = (value = '') => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const legacyUnitToHtml = (unit) => {
+  const parts = [];
+  if (unit.title) parts.push(`<h4>${escapeHtml(unit.title)}</h4>`);
+  if (unit.description) parts.push(`<p>${escapeHtml(unit.description).replace(/\n/g, '<br>')}</p>`);
+  if (Array.isArray(unit.topics) && unit.topics.some(topic => String(topic || '').trim())) {
+    parts.push(`<p><strong>Topics:</strong> ${escapeHtml(unit.topics.filter(Boolean).join(', '))}</p>`);
+  }
+  if (unit.outcomes) parts.push(`<p><strong>Outcomes:</strong> ${escapeHtml(unit.outcomes)}</p>`);
+  return parts.join('');
+};
+
+const normalizeSyllabusUnits = (units = []) => units
+  .slice(0, 5)
+  .map((unit, index) => {
+    const richTextContent = stripUnsafeHtml(unit.richTextContent || legacyUnitToHtml(unit));
+    return {
+      unitNumber: unit.unitNumber || index + 1,
+      richTextContent,
+      title: unit.title || '',
+      description: unit.description || '',
+      topics: Array.isArray(unit.topics) ? unit.topics : [],
+      outcomes: unit.outcomes || '',
+      hours: Number.isFinite(Number(unit.hours)) ? Number(unit.hours) : 0,
+    };
+  });
+
+const syncStandaloneSyllabusUnits = async (versionId, updatedVersion, operatorUser) => {
+  if (!updatedVersion?.courseId || !Array.isArray(updatedVersion.syllabusUnits)) return;
+
+  const courseId = updatedVersion.courseId._id || updatedVersion.courseId;
+  const unitNumbers = updatedVersion.syllabusUnits.map(unit => unit.unitNumber);
+
+  if (updatedVersion.syllabusUnits.length > 0) {
+    await SyllabusUnit.bulkWrite(updatedVersion.syllabusUnits.map(unit => ({
+      updateOne: {
+        filter: {
+          courseId,
+          courseVersionId: versionId,
+          unitNumber: unit.unitNumber,
+        },
+        update: {
+          $set: {
+            richTextContent: unit.richTextContent || '',
+            updatedBy: operatorUser.id,
+          },
+          $setOnInsert: {
+            createdBy: operatorUser.id,
+          },
+        },
+        upsert: true,
+      },
+    })));
+  }
+
+  await SyllabusUnit.deleteMany({
+    courseVersionId: versionId,
+    unitNumber: { $nin: unitNumbers },
+  });
+};
 
 export const getCoursesByDept = async (deptId) => {
   return courseRepository.findCoursesByDepartment(deptId);
@@ -160,6 +235,10 @@ export const saveSyllabusDraft = async (versionId, updateData, operatorUser) => 
     'cieSee'
   ];
 
+  if (Array.isArray(updateData.syllabusUnits)) {
+    updateData.syllabusUnits = normalizeSyllabusUnits(updateData.syllabusUnits);
+  }
+
   const sanitizedUpdateData = operatorUser.role === 'Coordinator'
     ? coordinatorAllowedFields.reduce((allowed, field) => {
         if (Object.prototype.hasOwnProperty.call(updateData, field)) {
@@ -171,6 +250,10 @@ export const saveSyllabusDraft = async (versionId, updateData, operatorUser) => 
 
   // Update version
   const updated = await courseRepository.updateCourseVersion(versionId, sanitizedUpdateData);
+
+  if (Array.isArray(sanitizedUpdateData.syllabusUnits)) {
+    await syncStandaloneSyllabusUnits(versionId, updated, operatorUser);
+  }
   
   await AuditLog.create({
     userId: operatorUser.id,

@@ -105,11 +105,12 @@ export const updateCourseVersionSchema = z.object({
 
   syllabusUnits: z.array(z.object({
     unitNumber: z.number().int().min(1).max(5),
-    title: z.string(),
+    richTextContent: z.string().optional(),
+    title: z.string().optional(),
     description: z.string().optional(),
-    topics: z.array(z.string()),
+    topics: z.array(z.string()).optional(),
     outcomes: z.string().optional(),
-    hours: z.number().int().min(1).max(30).optional()
+    hours: z.number().int().min(0).max(30).optional()
   })).optional(),
 
   labPracticals: z.array(z.object({
@@ -175,4 +176,3 @@ export const changePasswordSchema = z.object({
       message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.'
     })
 });
-

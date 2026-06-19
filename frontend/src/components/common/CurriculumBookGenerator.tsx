@@ -6,6 +6,8 @@ import {
   HelpCircle, ChevronRight, Activity, ArrowRight, Grid3X3, Database
 } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, BorderStyle, WidthType } from 'docx';
+// CODEx-added: Uses the existing university logo asset to match the reference PDF cover and page header style.
+import adityaLogo from '../../assets/aditya-logo.png';
 
 export const CurriculumBookGenerator: React.FC = () => {
   const { selectedProgram, selectedDepartment, selectedRegulation } = useContextStore();
@@ -17,6 +19,41 @@ export const CurriculumBookGenerator: React.FC = () => {
   
   // Loaded context data
   const [programDetails, setProgramDetails] = useState<any>(null);
+  // CODEx-added start: Default curriculum book branding used when Admin has not configured a program/regulation.
+  const defaultBookTemplate = {
+    coverTitle: 'Academic Curriculum & Syllabus Book',
+    coverSubtitle: '',
+    coverNote: "Accredited by NAAC with 'A++' Grade - Approved by AICTE",
+    headerText: 'Aditya University - OBE Curriculum Portal',
+    footerText: 'Outcome Based Curriculum Planning & Mapping Portal',
+    watermarkText: 'ADITYA UNIVERSITY'
+  };
+  // CODEx-added end
+
+  // CODEx-added start: Merge program-level defaults with regulation-level overrides for this handbook.
+  const programTemplate = programDetails?.curriculumBookTemplate || {};
+  // CODEx-added: Regulation layout overrides win over program defaults for the selected regulation.
+  const regulationLayout = selectedRegulation?.curriculumLayout || {};
+  // CODEx-added: Resolved handbook layout drives preview, print, and DOCX content.
+  const resolvedBookLayout = {
+    coverTitle: regulationLayout.coverTitle || programTemplate.coverTitle || defaultBookTemplate.coverTitle,
+    coverSubtitle: regulationLayout.coverSubtitle || programTemplate.coverSubtitle || defaultBookTemplate.coverSubtitle,
+    coverNote: programTemplate.coverNote || defaultBookTemplate.coverNote,
+    headerText: regulationLayout.headerText || programTemplate.headerText || defaultBookTemplate.headerText,
+    footerText: regulationLayout.footerText || programTemplate.footerText || defaultBookTemplate.footerText,
+    watermarkText: regulationLayout.watermarkText || programTemplate.watermarkText || defaultBookTemplate.watermarkText,
+    pageBorderStyle: regulationLayout.pageBorderStyle || 'classic',
+    accentColor: regulationLayout.accentColor || '#1d4ed8'
+  };
+  // CODEx-added end
+
+  // CODEx-added start: Computes the cover page border class from the selected regulation layout.
+  const coverBorderClass = resolvedBookLayout.pageBorderStyle === 'none'
+    ? 'border-0'
+    : resolvedBookLayout.pageBorderStyle === 'minimal'
+    ? 'border border-slate-500'
+    : 'border-4 border-double border-slate-800';
+  // CODEx-added end
 
   useEffect(() => {
     const loadData = async () => {
@@ -69,9 +106,20 @@ export const CurriculumBookGenerator: React.FC = () => {
               new Paragraph({
                 children: [
                   new TextRun({
-                    text: `${selectedProgram?.name || 'B.Tech'} - ${selectedDepartment.name}`,
+                    // CODEx-added: Uses the resolved Admin-configured cover title in DOCX export.
+                    text: resolvedBookLayout.coverTitle,
                     bold: true,
                     size: 32,
+                  }),
+                ],
+              }),
+              // CODEx-added start: Includes program/regulation cover subtitle and branding metadata in DOCX export.
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: resolvedBookLayout.coverSubtitle || `${selectedProgram?.name || 'B.Tech'} - ${selectedDepartment.name}`,
+                    bold: true,
+                    size: 26,
                   }),
                 ],
               }),
@@ -84,6 +132,19 @@ export const CurriculumBookGenerator: React.FC = () => {
                   }),
                 ],
               }),
+              new Paragraph({
+                text: `Header: ${resolvedBookLayout.headerText}`,
+                spacing: { before: 160 }
+              }),
+              new Paragraph({
+                text: `Watermark: ${resolvedBookLayout.watermarkText}`,
+                spacing: { before: 80 }
+              }),
+              new Paragraph({
+                text: `Footer: ${resolvedBookLayout.footerText}`,
+                spacing: { before: 80 }
+              }),
+              // CODEx-added end
               new Paragraph({
                 text: "Generated dynamically from AU OBCPMP Portal",
                 spacing: { before: 200 }
@@ -127,6 +188,158 @@ export const CurriculumBookGenerator: React.FC = () => {
   }, {} as Record<string, number>);
 
   const grandTotalCredits = Object.values(categoryCredits).reduce((sum, v) => sum + v, 0);
+  // CODEx-added start: Reference-PDF curriculum category order and UGC credit guidance.
+  const pdfCategoryRows = [
+    { code: 'MCC', name: 'Major Core Courses (MCC)', ugc: 80 },
+    { code: 'MSC/UEC', name: 'Minor Stream Courses (MSC) (or) University Open Elective Courses (UEC)', ugc: 32 },
+    { code: 'MDC', name: 'Multidisciplinary Courses (MDC)', ugc: 9 },
+    { code: 'AEC', name: 'Ability Enhancement Courses (AEC)', ugc: 8 },
+    { code: 'SEC', name: 'Skill Enhancement Courses (SEC)', ugc: 9 },
+    { code: 'VAC', name: 'Value Added Courses (VAC)', ugc: '6-8' },
+    { code: 'SI', name: 'Summer Internships (SI)', ugc: '2-4' },
+    { code: 'PROJ', name: 'Full Semester Internship (PROJ)', ugc: 12 },
+    { code: 'MC', name: 'Mandatory Courses (MC)', ugc: '' }
+  ];
+  // CODEx-added: Course categories rendered as separate PDF-style tables like the source document.
+  const pdfCourseCategoryRows = [
+    { code: 'MCC', title: 'Major Core Courses (MCC)' },
+    { code: 'MDC', title: 'Multidisciplinary Courses (MDC)' },
+    { code: 'AEC', title: 'Ability Enhancement Courses (AEC)' },
+    { code: 'SEC', title: 'Skill Enhancement Courses (SEC)' },
+    { code: 'VAC', title: 'Value Added Courses (VAC)' },
+    { code: 'SI', title: 'Summer Internships (SI)' },
+    { code: 'PROJ', title: 'Full Semester Internship (PROJ)' },
+    { code: 'MC', title: 'Mandatory Courses (MC)' }
+  ];
+  // CODEx-added: Course level buckets mirror the reference PDF's FC/IC/AC grouping.
+  const pdfLevelRows = [
+    { key: 'FC', title: 'Foundation Courses (FC)' },
+    { key: 'IC', title: 'Intermediate-Level Courses (IC)' },
+    { key: 'AC', title: 'Advanced Courses (AC)' }
+  ];
+  // CODEx-added: Semester count follows the selected regulation instead of hard-coded eight semesters.
+  const pdfSemesterCount = selectedRegulation?.semesterCount || 8;
+  // CODEx-added: Shared helper for credit totals where MSC and UEC are combined in the reference PDF.
+  const getCategoryCreditTotal = (code: string) => code === 'MSC/UEC'
+    ? (categoryCredits.MSC || 0) + (categoryCredits.UEC || 0)
+    : (categoryCredits[code] || 0);
+  // CODEx-added: Shared helper for course rows in category and level tables.
+  const getCourseCreditsText = (v: any) => `${v.credits?.L || 0} ${v.credits?.T || 0} ${v.credits?.P || 0} ${v.credits?.C || 0}`;
+  // CODEx-added end
+
+  // CODEx-added start: Reference-PDF page wrapper now acts as a content block, relying on the global print table for headers/footers.
+  const PdfPage = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+    <section className={`pdf-content-section ${className}`}>
+      <div className="pdf-page-content">{children}</div>
+    </section>
+  );
+  // CODEx-added end
+
+  // CODEx-added start: Renders a source-PDF-style course category table.
+  const renderPdfCourseTable = (title: string, rows: any[]) => (
+    <div className="pdf-table-block print:break-inside-avoid">
+      <h3 className="pdf-section-title">{title}</h3>
+      <table className="pdf-grid-table">
+        <thead>
+          <tr>
+            <th>Course Code</th>
+            <th>Course Name</th>
+            <th>Level</th>
+            <th>L</th>
+            <th>T</th>
+            <th>P</th>
+            <th>C</th>
+            <th>CIE</th>
+            <th>SEE</th>
+            <th>Total</th>
+            <th>Pre-requisite</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((v) => (
+            <tr key={v._id}>
+              <td>{v.courseId?.code || '-'}</td>
+              <td className="text-left">{v.courseId?.title || '-'}</td>
+              <td>{v.level || (v.knowledgeLevel?.includes('Advanced') ? 'AC' : v.knowledgeLevel?.includes('Intermediate') ? 'IC' : 'FC')}</td>
+              <td>{v.credits?.L || ''}</td>
+              <td>{v.credits?.T || ''}</td>
+              <td>{v.credits?.P || ''}</td>
+              <td>{v.credits?.C || ''}</td>
+              <td>{v.cieSee?.cieMaxMarks || 50}</td>
+              <td>{v.cieSee?.seeMaxMarks || 50}</td>
+              <td>{(v.cieSee?.cieMaxMarks || 50) + (v.cieSee?.seeMaxMarks || 50)}</td>
+              <td>{v.prerequisites?.[0] || '-'}</td>
+            </tr>
+          ))}
+          <tr className="font-bold">
+            <td colSpan={3}>Total</td>
+            <td>{rows.reduce((sum, v) => sum + (v.credits?.L || 0), 0)}</td>
+            <td>{rows.reduce((sum, v) => sum + (v.credits?.T || 0), 0)}</td>
+            <td>{rows.reduce((sum, v) => sum + (v.credits?.P || 0), 0)}</td>
+            <td>{rows.reduce((sum, v) => sum + (v.credits?.C || 0), 0)}</td>
+            <td colSpan={4}></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+  // CODEx-added end
+
+  // CODEx-added start: Renders one detailed syllabus entry in the compact reference-PDF format.
+  const renderPdfSyllabusCourse = (v: any) => (
+    <PdfPage key={v._id}>
+      <div className="pdf-course-header">
+        <h3>{v.courseId?.title}</h3>
+        <p>{v.offeredFor?.length ? `(Common to ${v.offeredFor.join(', ')})` : `(For ${selectedDepartment?.name || 'Computer Science and Engineering'})`}</p>
+      </div>
+      <div className="pdf-course-meta">
+        <div><strong>Course Code:</strong> {v.courseId?.code || '-'}</div>
+        <table className="pdf-mini-table">
+          <thead><tr><th>L</th><th>T</th><th>P</th><th>C</th></tr></thead>
+          <tbody><tr><td>{v.credits?.L || 0}</td><td>{v.credits?.T || 0}</td><td>{v.credits?.P || 0}</td><td>{v.credits?.C || 0}</td></tr></tbody>
+        </table>
+      </div>
+      {v.courseOutcomes?.length > 0 && (
+        <div className="pdf-syllabus-section">
+          <h4>Course Outcomes:</h4>
+          <p><strong>At the end of the Course, Student will be able to:</strong></p>
+          {v.courseOutcomes.map((co: any) => (
+            <p key={co.coCode}><strong>{co.coCode}:</strong> {co.description}</p>
+          ))}
+        </div>
+      )}
+      {v.coPoMappings?.length > 0 && (
+        <div className="pdf-syllabus-section">
+          <h4>Mapping of Course Outcomes with Program Outcomes:</h4>
+          <table className="pdf-grid-table pdf-matrix-table">
+            <thead>
+              <tr><th>CO/PO</th>{[...Array(12)].map((_, i) => <th key={i}>PO {i + 1}</th>)}</tr>
+            </thead>
+            <tbody>
+              {v.courseOutcomes?.map((co: any) => {
+                const mapping = v.coPoMappings?.find((m: any) => m.coCode === co.coCode) || { po: {} };
+                return <tr key={co.coCode}><td>{co.coCode}</td>{[...Array(12)].map((_, i) => <td key={i}>{mapping.po[`PO${i + 1}`] || ''}</td>)}</tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {v.syllabusUnits?.map((unit: any) => (
+        <div key={unit.unitNumber} className="pdf-unit-block">
+          <h4>UNIT - {unit.unitNumber}</h4>
+          <p><strong>{unit.title}:</strong> {unit.description || unit.topics?.join(', ')}</p>
+          {unit.topics?.length > 0 && <p>{unit.topics.join(', ')}</p>}
+        </div>
+      ))}
+      {(v.textbooks?.length > 0 || v.referenceMaterials?.length > 0) && (
+        <div className="pdf-syllabus-section">
+          {v.textbooks?.length > 0 && <p><strong>Text Books:</strong> {v.textbooks.map((tb: any) => typeof tb === 'string' ? tb : tb.title).join('; ')}</p>}
+          {v.referenceMaterials?.length > 0 && <p><strong>Reference Books:</strong> {v.referenceMaterials.map((ref: any) => typeof ref === 'string' ? ref : ref.title).join('; ')}</p>}
+        </div>
+      )}
+    </PdfPage>
+  );
+  // CODEx-added end
 
   return (
     <div className="space-y-6 font-sans no-print-container">
@@ -156,429 +369,413 @@ export const CurriculumBookGenerator: React.FC = () => {
 
       {/* Main Preview Container */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-12 max-w-[900px] mx-auto print:p-0 print:border-0 print:shadow-none print-layout" id="curriculum-handbook-print-root">
+        {/* CODEx-added start: Program/regulation handbook header, footer, and watermark applied to printed preview. */}
+        {resolvedBookLayout.headerText && (
+          <div className="print-book-header hidden print:block">
+            {resolvedBookLayout.headerText}
+          </div>
+        )}
+        {resolvedBookLayout.watermarkText && (
+          <div className="print-book-watermark">
+            {resolvedBookLayout.watermarkText}
+          </div>
+        )}
+        {resolvedBookLayout.footerText && (
+          <div className="print-book-footer hidden print:block">
+            {resolvedBookLayout.footerText}
+          </div>
+        )}
+        {/* CODEx-added end */}
         
         {/* SECTION 1: COVER PAGE */}
-        <div className="flex flex-col items-center justify-between min-h-[950px] border-4 border-double border-slate-800 p-12 text-center relative print:border-slate-800 print:min-h-screen">
-          <div className="space-y-2">
-            <h4 className="text-xs uppercase font-extrabold text-slate-500 tracking-widest font-serif">Academic Curriculum & Syllabus Book</h4>
-            <div className="w-16 h-1 bg-slate-800 mx-auto mt-2"></div>
-          </div>
-
-          <div className="space-y-4 my-10">
-            <h1 className="text-3xl font-black text-slate-900 leading-tight uppercase font-serif">
-              {programDetails?.degree || 'B.Tech'} IN {selectedDepartment?.name}
-            </h1>
-            <p className="text-base text-slate-600 font-medium tracking-wide uppercase">
-              Regulation context: <span className="font-mono font-bold text-blue-600">{selectedRegulation?.code}</span>
-            </p>
-          </div>
-
-          <div className="space-y-8">
-            <div className="flex justify-center">
-              {/* Aditya University Placeholder logo */}
-              <div className="w-24 h-24 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold font-serif text-3xl shadow-md">
-                AU
-              </div>
-            </div>
-            <div>
-              <h3 className="text-md font-bold text-slate-800 font-serif uppercase tracking-wider">Aditya University</h3>
-              <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest mt-1">Accredited by NAAC with 'A++' Grade · Approved by AICTE</p>
+        {/* CODEx-added: Cover page border now follows the selected regulation layout. */}
+        <div className={`pdf-cover-page ${coverBorderClass}`}>
+          {/* CODEx-added start: Reference PDF cover structure with formal serif hierarchy and rounded department box. */}
+          <div className="pdf-cover-top">
+            <h1>{resolvedBookLayout.coverTitle || 'PROGRAM CURRICULUM'}</h1>
+            <div className="pdf-cover-dept-box">
+              {selectedDepartment?.name || 'Computer Science and Engineering'}
             </div>
           </div>
+          <div className="pdf-cover-program">
+            <p>for</p>
+            <h2>{(programDetails?.degree || 'B. TECH. FOUR YEAR DEGREE PROGRAM').toUpperCase()}</h2>
+            <p>(Applicable for the batches admitted from A.Y. {selectedRegulation?.academicYear || '2024'}-{String((selectedRegulation?.academicYear || 2024) + 1).slice(-2)})</p>
+            {resolvedBookLayout.coverSubtitle && <p>{resolvedBookLayout.coverSubtitle}</p>}
+          </div>
+          <div className="pdf-cover-brand">
+            <img src={adityaLogo} alt="Aditya University" />
+            <p>Aditya Nagar, ADB Road, Surampalem - 533 437</p>
+            <p>{resolvedBookLayout.coverNote}</p>
+          </div>
+          {/* CODEx-added end */}
         </div>
 
-        {/* Page Break */}
+        {/* CODEx-added start: Reference PDF structure pages after cover. */}
         <div className="page-break"></div>
 
-        {/* SECTION 2: PROGRAM INFORMATION */}
-        <div className="py-10 space-y-8 print:py-6">
-          <div className="border-b-2 border-slate-800 pb-2">
-            <h2 className="text-xl font-bold uppercase tracking-wider text-slate-800 font-serif">1. Program Overview</h2>
+        <table className="print-wrapper w-full">
+          <thead className="print-header hidden print:table-header-group">
+            <tr>
+              <td>
+                <div className="flex justify-end pb-4 pt-8">
+                  <img src={adityaLogo} alt="Aditya University" className="w-[86px] h-auto" />
+                </div>
+              </td>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+        <PdfPage>
+          <div className="pdf-frontmatter">
+            <h2>Department of {selectedDepartment?.name || 'Computer Science and Engineering'}</h2>
+            <h3>{programDetails?.degree || 'B.Tech'} ({selectedDepartment?.code || 'CSE'}) Program Curriculum-{selectedRegulation?.academicYear || '2024'}</h3>
+            <p>(Applicable for the batches admitted from the A.Y. {selectedRegulation?.academicYear || '2024'}-{String((selectedRegulation?.academicYear || 2024) + 1).slice(-2)})</p>
+            <h4>UG Programs Offered</h4>
+            <ul>
+              <li>B. Tech in ({selectedDepartment?.name || 'Computer Science and Engineering'})</li>
+              <li>B. Tech in ({selectedDepartment?.name || 'Computer Science and Engineering'}) with Minor degree / Honors options</li>
+            </ul>
+            <h4>Minor Streams offered in {programDetails?.degree || 'B.Tech'} ({selectedDepartment?.name || 'Computer Science and Engineering'})</h4>
+            <ul>
+              {minorStreams.length > 0 ? minorStreams.map((stream) => <li key={stream._id}>Minor Stream in {stream.name}</li>) : <li>Minor streams will be listed after configuration.</li>}
+            </ul>
           </div>
-          
-          <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-500">
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <span className="block text-[10px] uppercase text-slate-400 font-bold">Academic Degree</span>
-              <strong className="text-slate-800 text-sm mt-1 block">{programDetails?.degree || 'Bachelor of Technology'}</strong>
-            </div>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <span className="block text-[10px] uppercase text-slate-400 font-bold">Total Credits Requirement</span>
-              <strong className="text-slate-800 text-sm mt-1 block">{programDetails?.totalCredits || 160} Credits</strong>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Vision</h3>
-            <p className="text-xs text-slate-600 leading-relaxed font-medium bg-slate-50/50 p-3 rounded-lg border border-slate-200/50">
-              {programDetails?.vision || 'To provide high-quality engineering education that prepares students for globally competitive careers and lifelong learning.'}
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Mission</h3>
-            <p className="text-xs text-slate-600 leading-relaxed font-medium bg-slate-50/50 p-3 rounded-lg border border-slate-200/50 whitespace-pre-line">
-              {programDetails?.mission || 'M1: Offer state-of-the-art laboratory and academic resources.\nM2: Industry-collaborated curriculum frameworks for industry readiness.'}
-            </p>
-          </div>
-        </div>
-
+        </PdfPage>
         <div className="page-break"></div>
-
-        {/* SECTION 3: CREDIT DISTRIBUTION */}
-        <div className="py-10 space-y-6 print:py-6">
-          <div className="border-b-2 border-slate-800 pb-2">
-            <h2 className="text-xl font-bold uppercase tracking-wider text-slate-800 font-serif">2. Category-Wise Credit Distribution</h2>
-          </div>
-          <p className="text-xs text-slate-600">The total graduation requirements are structured across {categories.length} distinct outcome categories mapping to AICTE guidelines.</p>
-
-          <table className="w-full text-left border-collapse text-xs border border-slate-300">
+        <PdfPage>
+          <h3 className="pdf-section-title">Credit Division Category-wise</h3>
+          <table className="pdf-grid-table pdf-credit-table">
             <thead>
-              <tr className="bg-slate-100 text-slate-800 font-bold border-b border-slate-300 uppercase">
-                <th className="p-3 pl-4 border-r border-slate-300">Category Code</th>
-                <th className="p-3 border-r border-slate-300">Category Name</th>
-                <th className="p-3 text-right pr-4">Total Credits</th>
-              </tr>
+              <tr><th>S.No</th><th>Broad Category of Course</th><th>UGC</th><th>Credits</th></tr>
             </thead>
             <tbody>
-              {[
-                { code: 'MCC', name: 'Major Core Courses' },
-                { code: 'MDC', name: 'Multi-Disciplinary Courses' },
-                { code: 'AEC', name: 'Ability Enhancement Courses' },
-                { code: 'SEC', name: 'Skill Enhancement Courses' },
-                { code: 'VAC', name: 'Value Added Courses' },
-                { code: 'MSC', name: 'Minor Stream Courses' },
-                { code: 'UEC', name: 'University Open Electives' },
-                { code: 'MC', name: 'Mandatory Courses' },
-                { code: 'SI', name: 'Summer Internships' },
-                { code: 'PROJ', name: 'Project Works' }
-              ].map((cat) => (
-                <tr key={cat.code} className="border-b border-slate-200 text-slate-650 font-medium">
-                  <td className="p-3 pl-4 border-r border-slate-300 font-bold font-mono text-blue-600">{cat.code}</td>
-                  <td className="p-3 border-r border-slate-300 font-semibold">{cat.name}</td>
-                  <td className="p-3 text-right pr-4 font-bold text-slate-800">{categoryCredits[cat.code] || 0}</td>
+              {pdfCategoryRows.map((row, idx) => (
+                <tr key={row.code}>
+                  <td>{idx + 1}</td>
+                  <td className="text-left">{row.name}</td>
+                  <td>{row.ugc}</td>
+                  <td>{getCategoryCreditTotal(row.code)}</td>
                 </tr>
               ))}
-              <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-350">
-                <td colSpan={2} className="p-3 pl-4 border-r border-slate-300 uppercase text-right">Grand Total credits</td>
-                <td className="p-3 text-right pr-4 text-blue-700 font-black">{grandTotalCredits}</td>
+              <tr className="font-bold">
+                <td colSpan={2}>Total Credits to be earned for B. Tech Degree</td>
+                <td>{programDetails?.totalCredits || 160}</td>
+                <td>{grandTotalCredits || programDetails?.totalCredits || 160}</td>
               </tr>
             </tbody>
           </table>
-        </div>
-
-        <div className="page-break"></div>
-
-        {/* SECTION 4 - 13: SEMESTER-WISE BREAKDOWN TABLES */}
-        <div className="py-10 space-y-8 print:py-6">
-          <div className="border-b-2 border-slate-800 pb-2">
-            <h2 className="text-xl font-bold uppercase tracking-wider text-slate-800 font-serif">3. Regulation Course Mappings</h2>
+          <div className="pdf-level-note">
+            <p><strong>Foundation Courses - FC</strong></p>
+            <p><strong>Intermediate-level Courses - IC</strong></p>
+            <p><strong>Advanced Courses - AC</strong></p>
           </div>
-
-          {Array.from({ length: 8 }).map((_, semIdx) => {
-            const semNum = semIdx + 1;
-            const semCourses = courseVersions.filter(v => v.semester === semNum);
-            
-            if (semCourses.length === 0) return null;
-
+        </PdfPage>
+        <div className="page-break"></div>
+        <PdfPage>
+          {pdfCourseCategoryRows.map((cat) => {
+            const rows = courseVersions.filter((v) => v.category === cat.code);
+            if (rows.length === 0) return null;
+            return renderPdfCourseTable(cat.title, rows);
+          })}
+        </PdfPage>
+        <div className="page-break"></div>
+        <PdfPage>
+          {pdfLevelRows.map((level) => {
+            const rows = courseVersions.filter((v) => (v.level || v.knowledgeLevel || '').includes(level.key) || (level.key === 'FC' && !v.level && !v.knowledgeLevel));
+            if (rows.length === 0) return null;
             return (
-              <div key={semNum} className="space-y-3 pb-6 border-b border-slate-100 last:border-0 print:break-inside-avoid">
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-                  <Layers className="w-4.5 h-4.5 text-blue-600" />
-                  <span>Semester {semNum}</span>
-                </h3>
-                <table className="w-full text-left border-collapse text-xs border border-slate-200">
-                  <thead>
-                    <tr className="bg-slate-55 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px]">
-                      <th className="p-2.5 pl-3 border-r border-slate-200">Course Code</th>
-                      <th className="p-2.5 border-r border-slate-200">Title</th>
-                      <th className="p-2.5 border-r border-slate-200">Category</th>
-                      <th className="p-2.5 text-center border-r border-slate-200">L - T - P - S</th>
-                      <th className="p-2.5 text-right pr-3">Credits</th>
-                    </tr>
-                  </thead>
+              <div key={level.key} className="pdf-table-block">
+                <h3 className="pdf-section-title">{level.title}</h3>
+                <table className="pdf-grid-table">
+                  <thead><tr><th>Course Name</th><th>Category</th><th>L</th><th>T</th><th>P</th><th>C</th></tr></thead>
                   <tbody>
-                    {semCourses.map(v => (
-                      <tr key={v._id} className="border-b border-slate-100 hover:bg-slate-50/20 text-slate-650 font-medium">
-                        <td className="p-2.5 pl-3 border-r border-slate-200 font-mono font-bold text-blue-600">{v.courseId?.code}</td>
-                        <td className="p-2.5 border-r border-slate-200 font-semibold text-slate-800">{v.courseId?.title}</td>
-                        <td className="p-2.5 border-r border-slate-200 font-bold">{v.category}</td>
-                        <td className="p-2.5 text-center border-r border-slate-200 font-mono text-[11px] font-semibold">{v.credits?.L || 3} - {v.credits?.T || 0} - {v.credits?.P || 0} - {v.credits?.S || 0}</td>
-                        <td className="p-2.5 text-right pr-3 font-bold text-slate-800">{v.credits?.C || 3}</td>
-                      </tr>
-                    ))}
+                    {rows.map((v) => <tr key={v._id}><td className="text-left">{v.courseId?.title || '-'}</td><td>{v.category}</td><td>{v.credits?.L || ''}</td><td>{v.credits?.T || ''}</td><td>{v.credits?.P || ''}</td><td>{v.credits?.C || ''}</td></tr>)}
                   </tbody>
                 </table>
               </div>
             );
           })}
-        </div>
-
+        </PdfPage>
         <div className="page-break"></div>
-
-        {/* SECTION 12: MINOR STREAMS */}
-        {minorStreams.length > 0 && (
-          <div className="py-10 space-y-6 print:py-6">
-            <div className="border-b-2 border-slate-800 pb-2">
-              <h2 className="text-xl font-bold uppercase tracking-wider text-slate-800 font-serif">4. Minor Streams Mapping</h2>
-            </div>
-            {minorStreams.map(stream => (
-              <div key={stream._id} className="space-y-3 border border-slate-200 p-4 rounded-xl print:break-inside-avoid">
-                <h3 className="text-sm font-bold text-blue-700 uppercase tracking-wide flex items-center gap-1.5">
-                  <Layers className="w-4 h-4" />
-                  <span>Stream: {stream.name}</span>
-                </h3>
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase">
-                      <th className="p-2 pl-3">Course Code</th>
-                      <th className="p-2">Course Name</th>
-                    </tr>
-                  </thead>
+        <PdfPage>
+          <h3 className="pdf-section-title">Semester-wise Course Structure</h3>
+          {Array.from({ length: pdfSemesterCount }).map((_, semIdx) => {
+            const semNum = semIdx + 1;
+            const semCourses = courseVersions.filter((v) => v.semester === semNum);
+            if (semCourses.length === 0) return null;
+            return (
+              <div key={semNum} className="pdf-table-block">
+                <h3 className="pdf-section-title">Semester - {semNum}</h3>
+                <table className="pdf-grid-table">
+                  <thead><tr><th>Course code</th><th>Course Title</th><th>Category</th><th>Course Credits</th><th>Total</th></tr></thead>
                   <tbody>
-                    {stream.courses.map((c: any) => (
-                      <tr key={c._id} className="border-b border-slate-100 font-semibold text-slate-700">
-                        <td className="p-2 pl-3 font-mono text-blue-600">{c.code}</td>
-                        <td>{c.title}</td>
-                      </tr>
-                    ))}
+                    {semCourses.map((v) => <tr key={v._id}><td>{v.courseId?.code || '-'}</td><td className="text-left">{v.courseId?.title || '-'}</td><td>{v.category}</td><td>{getCourseCreditsText(v)}</td><td>{v.credits?.C || 0}</td></tr>)}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
+        </PdfPage>
+        <div className="page-break"></div>
+        {minorStreams.length > 0 && (
+          <PdfPage>
+            {minorStreams.map((stream) => (
+              <div key={stream._id} className="pdf-table-block">
+                <h3 className="pdf-section-title">Minor Stream: {stream.name}</h3>
+                <table className="pdf-grid-table">
+                  <thead><tr><th>Course Code</th><th>Course Name</th><th>Level</th><th>L</th><th>T</th><th>P</th><th>C</th><th>CIE</th><th>SEE</th><th>Total</th><th>Pre-requisite</th></tr></thead>
+                  <tbody>
+                    {stream.courses?.map((c: any) => <tr key={c._id}><td>{c.code}</td><td className="text-left">{c.title}</td><td>IC</td><td></td><td></td><td></td><td></td><td>50</td><td>50</td><td>100</td><td>-</td></tr>)}
                   </tbody>
                 </table>
               </div>
             ))}
-          </div>
+          </PdfPage>
         )}
-
-        <div className="page-break"></div>
-
-        {/* SECTION 17: PREREQUISITE GRAPH FLOWCHARTS */}
+        {minorStreams.length > 0 && <div className="page-break"></div>}
         {prereqLinks.length > 0 && (
-          <div className="py-10 space-y-6 print:py-6">
-            <div className="border-b-2 border-slate-800 pb-2">
-              <h2 className="text-xl font-bold uppercase tracking-wider text-slate-800 font-serif">5. Prerequisite Flowcharts Hierarchy</h2>
-            </div>
-            <p className="text-xs text-slate-500 leading-relaxed font-medium">Below is the sequence graph mapping of prerequisite courses in the R24 regulation context.</p>
-            
-            <div className="border border-slate-200 p-6 rounded-2xl bg-slate-50 space-y-3">
-              {prereqLinks.map(link => (
-                <div key={link._id} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 shadow-sm w-max print:break-inside-avoid">
-                  <span className="font-mono text-blue-600 bg-blue-50 px-2.5 py-1 rounded border border-blue-100">{link.sourceCourseId?.code}</span>
-                  <span className="text-slate-500 font-bold">{link.sourceCourseId?.title}</span>
-                  <ArrowRight className="w-4 h-4 text-slate-400" />
-                  <span className="font-mono text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-100">{link.targetCourseId?.code}</span>
-                  <span className="text-slate-500 font-bold">{link.targetCourseId?.title}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <PdfPage>
+            <h3 className="pdf-section-title">Prerequisite Course Mapping</h3>
+            <table className="pdf-grid-table">
+              <thead><tr><th>Source Course</th><th>Source Title</th><th>Target Course</th><th>Target Title</th></tr></thead>
+              <tbody>
+                {prereqLinks.map((link) => <tr key={link._id}><td>{link.sourceCourseId?.code}</td><td className="text-left">{link.sourceCourseId?.title}</td><td>{link.targetCourseId?.code}</td><td className="text-left">{link.targetCourseId?.title}</td></tr>)}
+              </tbody>
+            </table>
+          </PdfPage>
         )}
-
-        <div className="page-break"></div>
-
-        {/* SECTION 18: DETAILED COURSE SYLLABUS LISTING */}
-        <div className="py-10 space-y-8 print:py-6">
-          <div className="border-b-2 border-slate-800 pb-2">
-            <h2 className="text-xl font-bold uppercase tracking-wider text-slate-800 font-serif">6. Detailed Course Syllabus & Outlines</h2>
-          </div>
-
-          {courseVersions.map((v, cIdx) => (
-            <div key={v._id} className="space-y-6 pt-6 pb-8 border-b border-slate-300 last:border-0 print:break-inside-avoid">
-              {/* Header */}
-              <div className="flex justify-between items-start gap-4">
-                <div>
-                  <span className="text-[10px] font-mono text-blue-600 font-bold uppercase bg-blue-50 px-2.5 py-0.5 rounded border border-blue-100">Course {cIdx + 1}</span>
-                  <h3 className="text-lg font-bold text-slate-900 mt-1 uppercase font-serif">{v.courseId?.code} - {v.courseId?.title}</h3>
+        {prereqLinks.length > 0 && <div className="page-break"></div>}
+        {courseVersions.map((v) => renderPdfSyllabusCourse(v))}
+              </td>
+            </tr>
+          </tbody>
+          <tfoot className="print-footer hidden print:table-footer-group">
+            <tr>
+              <td>
+                <div className="flex justify-between text-[13px] pt-8 pb-12 px-[34px]">
+                  <span>B.Tech ({selectedDepartment?.code || 'CSE'}) Curriculum-{selectedRegulation?.academicYear || '2024'}</span>
+                  <span>Page</span>
                 </div>
-                <div className="text-right text-xs font-mono font-bold text-slate-700 bg-slate-100 p-2 rounded border border-slate-200">
-                  <div>L-T-P-S: {v.credits?.L || 3}-{v.credits?.T || 0}-{v.credits?.P || 0}-{v.credits?.S || 0}</div>
-                  <div>Credits: {v.credits?.C || 3}</div>
-                </div>
-              </div>
-
-              {/* Objectives */}
-              {v.objectives?.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs uppercase font-extrabold tracking-wider text-slate-500">Course Objectives</h4>
-                  <ul className="list-disc pl-5 text-xs text-slate-600 space-y-1 font-semibold leading-relaxed">
-                    {v.objectives.map((obj: string, i: number) => <li key={i}>{obj}</li>)}
-                  </ul>
-                </div>
-              )}
-
-              {/* Course Outcomes */}
-              {v.courseOutcomes?.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-xs uppercase font-extrabold tracking-wider text-slate-500">Course Outcomes (COs)</h4>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="w-full text-left text-[11px] font-medium text-slate-600">
-                      <thead className="bg-slate-50 text-[10px] uppercase text-slate-500 font-extrabold">
-                        <tr>
-                          <th className="px-3 py-2 border-b border-slate-200 w-16">CO Code</th>
-                          <th className="px-3 py-2 border-b border-slate-200">Description</th>
-                          <th className="px-3 py-2 border-b border-slate-200 w-32">Bloom's Level</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {v.courseOutcomes.map((co: any) => (
-                          <tr key={co.coCode} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                            <td className="px-3 py-2 font-mono font-bold text-slate-800">{co.coCode}</td>
-                            <td className="px-3 py-2 leading-relaxed">{co.description || '-'}</td>
-                            <td className="px-3 py-2 text-slate-500 font-bold">{co.bloomLevel || '-'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* CO-PO Mapping */}
-              {v.coPoMappings?.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-xs uppercase font-extrabold tracking-wider text-slate-500">CO-PO Mapping Matrix</h4>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="w-full text-center text-[11px] font-medium text-slate-600">
-                      <thead className="bg-slate-50 text-[10px] uppercase text-slate-500 font-extrabold">
-                        <tr>
-                          <th className="px-3 py-2 border-b border-slate-200 border-r w-16 text-left">CO \ PO</th>
-                          {[...Array(12)].map((_, i) => (
-                            <th key={`po-${i+1}`} className="px-2 py-2 border-b border-slate-200">PO{i + 1}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {v.courseOutcomes?.map((co: any) => {
-                          const mapping = v.coPoMappings?.find((m: any) => m.coCode === co.coCode) || { po: {} };
-                          return (
-                            <tr key={co.coCode} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                              <td className="px-3 py-2 border-r border-slate-100 font-mono font-bold text-slate-800 text-left">{co.coCode}</td>
-                              {[...Array(12)].map((_, i) => {
-                                const val = mapping.po[`PO${i + 1}`] || 0;
-                                return (
-                                  <td key={`val-${i}`} className={`px-2 py-2 ${val > 0 ? 'text-blue-700 font-bold' : 'text-slate-300'}`}>
-                                    {val || '-'}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* CO-PSO Mapping */}
-              {v.coPsoMappings?.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-xs uppercase font-extrabold tracking-wider text-slate-500">CO-PSO Mapping Matrix</h4>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="w-full text-center text-[11px] font-medium text-slate-600">
-                      <thead className="bg-slate-50 text-[10px] uppercase text-slate-500 font-extrabold">
-                        <tr>
-                          <th className="px-3 py-2 border-b border-slate-200 border-r w-16 text-left">CO \ PSO</th>
-                          {[...Array(3)].map((_, i) => (
-                            <th key={`pso-${i+1}`} className="px-2 py-2 border-b border-slate-200">PSO{i + 1}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {v.courseOutcomes?.map((co: any) => {
-                          const mapping = v.coPsoMappings?.find((m: any) => m.coCode === co.coCode) || { pso: {} };
-                          return (
-                            <tr key={co.coCode} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                              <td className="px-3 py-2 border-r border-slate-100 font-mono font-bold text-slate-800 text-left">{co.coCode}</td>
-                              {[...Array(3)].map((_, i) => {
-                                const val = mapping.pso[`PSO${i + 1}`] || 0;
-                                return (
-                                  <td key={`val-${i}`} className={`px-2 py-2 ${val > 0 ? 'text-teal-700 font-bold' : 'text-slate-300'}`}>
-                                    {val || '-'}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Syllabus Units */}
-              {v.syllabusUnits?.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-xs uppercase font-extrabold tracking-wider text-slate-500">Syllabus Units Details</h4>
-                  <div className="space-y-3">
-                    {v.syllabusUnits.map((unit: any) => (
-                      <div key={unit.unitNumber} className="border border-slate-200 p-3 rounded-lg bg-slate-50/50 space-y-1.5">
-                        <strong className="block text-xs font-bold text-slate-800 uppercase tracking-wide">Unit {unit.unitNumber}: {unit.title} ({unit.hours || 10} Hours)</strong>
-                        <p className="text-[11px] text-slate-650 font-medium leading-relaxed">{unit.topics?.join(', ')}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Textbooks & References */}
-              <div className="grid grid-cols-2 gap-4">
-                {v.textbooks?.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-xs uppercase font-extrabold tracking-wider text-slate-500">Text Books</h4>
-                    <ul className="list-decimal pl-4 text-[11px] text-slate-600 space-y-1 font-semibold leading-relaxed">
-                      {v.textbooks.map((tb: any, i: number) => (
-                        <li key={i}>
-                          {typeof tb === 'string' ? tb : `${tb.title}${tb.author ? ' by ' + tb.author : ''}${tb.publisher || tb.edition ? ' (' + [tb.publisher, tb.edition].filter(Boolean).join(', ') + ')' : ''}`}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {v.referenceMaterials?.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-xs uppercase font-extrabold tracking-wider text-slate-500">Reference Materials</h4>
-                    <ul className="list-decimal pl-4 text-[11px] text-slate-600 space-y-1 font-semibold leading-relaxed">
-                      {v.referenceMaterials.map((ref: any, i: number) => (
-                        <li key={i}>
-                          {typeof ref === 'string' ? ref : `${ref.title}${ref.author ? ' by ' + ref.author : ''}${ref.publisher || ref.edition ? ' (' + [ref.publisher, ref.edition].filter(Boolean).join(', ') + ')' : ''}`}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {v.onlineResources?.length > 0 && (
-                <div className="space-y-2 border-t border-slate-100 pt-3">
-                  <h4 className="text-xs uppercase font-extrabold tracking-wider text-slate-500">Web Links / Online Resources</h4>
-                  <ul className="list-disc pl-5 text-[11px] text-slate-600 space-y-1 font-semibold leading-relaxed">
-                    {v.onlineResources.map((res: any, i: number) => (
-                      <li key={i}>
-                        {typeof res === 'string' ? res : (res.description ? `${res.url} - ${res.description}` : res.url)}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Assessment Scheme */}
-              <div className="space-y-2 border-t border-slate-200 pt-3">
-                <h4 className="text-xs uppercase font-extrabold tracking-wider text-slate-500">Assessment Scheme</h4>
-                <div className="grid grid-cols-3 gap-3 text-[11px] font-semibold text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <div>CIE Max Marks: <strong className="text-slate-800">{v.cieSee?.cieMaxMarks || 40}</strong></div>
-                  <div>SEE Max Marks: <strong className="text-slate-800">{v.cieSee?.seeMaxMarks || 60}</strong></div>
-                  <div>Total Marks: <strong className="text-slate-800">100</strong></div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+        {/* CODEx-added end */}
       </div>
 
       {/* Global CSS style injecting print definitions print layout */}
       <style>{`
+        /* CODEx-added start: Reference-PDF visual system for the generated curriculum book. */
+        #curriculum-handbook-print-root {
+          background: #f8fafc;
+        }
+        .pdf-cover-page {
+          min-height: 1050px;
+          background: #fff;
+          padding: 92px 44px 54px;
+          text-align: center;
+          font-family: "Times New Roman", Times, serif;
+          color: #000;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+        .pdf-cover-top h1 {
+          font-size: 30px;
+          font-weight: 900;
+          letter-spacing: 0;
+          margin: 0 0 96px;
+        }
+        .pdf-cover-dept-box {
+          width: 68%;
+          margin: 0 auto;
+          padding: 28px 28px;
+          border: 1.8px solid #000;
+          border-radius: 28px;
+          box-shadow: 3px 3px 0 #000;
+          text-transform: uppercase;
+          font-size: 26px;
+          line-height: 1.15;
+          font-weight: 900;
+        }
+        .pdf-cover-program {
+          display: flex;
+          flex-direction: column;
+          gap: 26px;
+          align-items: center;
+        }
+        .pdf-cover-program p {
+          margin: 0;
+          font-size: 19px;
+        }
+        .pdf-cover-program h2 {
+          margin: 0;
+          font-size: 28px;
+          font-weight: 900;
+        }
+        .pdf-cover-brand img {
+          width: 470px;
+          max-width: 85%;
+          margin: 0 auto 12px;
+        }
+        .pdf-cover-brand p {
+          margin: 5px 0;
+          font-size: 15px;
+        }
+        
+        .pdf-content-section {
+          background: #fff;
+          position: relative;
+          padding: 20px 40px;
+          font-family: "Times New Roman", Times, serif;
+          color: #000;
+        }
+        
+        .print-wrapper {
+          width: 100%;
+        }
+        .print-header {
+          display: table-header-group;
+        }
+        .print-footer {
+          display: table-footer-group;
+        }
+
+        .pdf-page-content {
+          position: relative;
+          z-index: 1;
+        }
+        .pdf-page-footer {
+          position: absolute;
+          left: 92px;
+          right: 92px;
+          bottom: 54px;
+          display: flex;
+          justify-content: space-between;
+          font-size: 13px;
+        }
+        .pdf-frontmatter {
+          font-size: 16px;
+          line-height: 1.5;
+        }
+        .pdf-frontmatter h2,
+        .pdf-frontmatter h3,
+        .pdf-frontmatter h4 {
+          text-align: center;
+          font-weight: 900;
+          margin: 12px 0;
+        }
+        .pdf-frontmatter ul {
+          margin: 8px 0 20px 80px;
+        }
+        .pdf-section-title {
+          text-align: center;
+          font-family: "Times New Roman", Times, serif;
+          font-size: 16px;
+          font-weight: 900;
+          margin: 0 0 18px;
+        }
+        .pdf-table-block {
+          margin: 0 0 34px;
+        }
+        .pdf-grid-table {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: auto;
+          font-family: "Times New Roman", Times, serif;
+          font-size: 14px;
+          line-height: 1.08;
+        }
+        .pdf-grid-table th,
+        .pdf-grid-table td {
+          border: 1px solid #000;
+          padding: 3px 6px;
+          text-align: center;
+          vertical-align: middle;
+        }
+        .pdf-grid-table th {
+          font-weight: 900;
+        }
+        .pdf-credit-table {
+          font-size: 16px;
+          line-height: 1.25;
+        }
+        .pdf-credit-table th,
+        .pdf-credit-table td {
+          padding: 11px 8px;
+        }
+        .pdf-level-note {
+          width: 70%;
+          margin: 8px auto 0;
+          font-size: 15px;
+          line-height: 1.5;
+        }
+        .pdf-course-header {
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .pdf-course-header h3 {
+          font-size: 16px;
+          font-weight: 900;
+          margin: 0;
+        }
+        .pdf-course-header p {
+          margin: 2px 0 0;
+          font-size: 15px;
+        }
+        .pdf-course-meta {
+          display: flex;
+          justify-content: space-between;
+          align-items: start;
+          margin-bottom: 18px;
+          font-size: 15px;
+        }
+        .pdf-mini-table {
+          border-collapse: collapse;
+          min-width: 160px;
+          font-size: 15px;
+        }
+        .pdf-mini-table th,
+        .pdf-mini-table td {
+          padding: 4px 12px;
+          text-align: center;
+          font-weight: 900;
+        }
+        .pdf-syllabus-section {
+          margin: 18px 0;
+          font-size: 15px;
+          line-height: 1.22;
+        }
+        .pdf-syllabus-section h4 {
+          font-size: 15px;
+          font-weight: 900;
+          margin: 0 0 4px;
+        }
+        .pdf-syllabus-section p {
+          margin: 3px 0;
+        }
+        .pdf-matrix-table {
+          width: 86%;
+          margin: 14px auto;
+          font-size: 13px;
+        }
+        .pdf-unit-block {
+          margin: 20px 0;
+          font-size: 15px;
+          line-height: 1.15;
+          text-align: justify;
+        }
+        .pdf-unit-block h4 {
+          font-size: 16px;
+          font-weight: 900;
+          margin: 0 0 14px;
+        }
+        .pdf-unit-block p {
+          margin: 4px 0;
+        }
+        /* CODEx-added end */
         @media print {
           body * {
             visibility: hidden;
@@ -606,7 +803,61 @@ export const CurriculumBookGenerator: React.FC = () => {
           .print-layout {
             display: block !important;
           }
+          /* CODEx-added start: Print-only header, footer, and watermark for curriculum books. */
+          .print-book-header {
+            position: fixed;
+            top: 12mm;
+            left: 18mm;
+            right: 18mm;
+            text-align: center;
+            font-size: 10px;
+            font-weight: 700;
+            color: #475569;
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 4px;
+          }
+          .print-book-footer {
+            position: fixed;
+            bottom: 10mm;
+            left: 18mm;
+            right: 18mm;
+            text-align: center;
+            font-size: 10px;
+            font-weight: 700;
+            color: #64748b;
+            border-top: 1px solid #cbd5e1;
+            padding-top: 4px;
+          }
+          .print-book-watermark {
+            position: fixed;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-32deg);
+            z-index: 0;
+            font-size: 58px;
+            font-weight: 900;
+            letter-spacing: 8px;
+            color: rgba(15, 23, 42, 0.06);
+            pointer-events: none;
+            white-space: nowrap;
+          }
+          /* CODEx-added end */
         }
+        /* CODEx-added start: On-screen watermark preview for curriculum book layout review. */
+        .print-book-watermark {
+          position: fixed;
+          top: 50%;
+          left: 58%;
+          transform: translate(-50%, -50%) rotate(-32deg);
+          z-index: 0;
+          font-size: 58px;
+          font-weight: 900;
+          letter-spacing: 8px;
+          color: rgba(15, 23, 42, 0.045);
+          pointer-events: none;
+          white-space: nowrap;
+        }
+        /* CODEx-added end */
       `}</style>
     </div>
   );

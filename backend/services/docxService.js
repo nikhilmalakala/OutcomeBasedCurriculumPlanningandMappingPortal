@@ -1,5 +1,18 @@
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, HeadingLevel, AlignmentType } from 'docx';
 
+const htmlToPlainText = (html = '') => String(html)
+  .replace(/<br\s*\/?>/gi, '\n')
+  .replace(/<\/(p|div|li|tr|h[1-6])>/gi, '\n')
+  .replace(/<[^>]+>/g, '')
+  .replace(/&nbsp;/g, ' ')
+  .replace(/&amp;/g, '&')
+  .replace(/&lt;/g, '<')
+  .replace(/&gt;/g, '>')
+  .replace(/&quot;/g, '"')
+  .replace(/&#39;/g, "'")
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
+
 export const generateSyllabusDocx = async (version) => {
   const course = version.courseId;
   const reg = version.regulationId;
@@ -163,29 +176,19 @@ export const generateSyllabusDocx = async (version) => {
           }),
           
           ...(version.syllabusUnits || []).map(unit => {
-            const unitPracticals = (version.labPracticals || []).filter(lab => lab.experimentNo === `U${unit.unitNumber}-Ex` || lab.title?.includes(`U${unit.unitNumber}`));
+            const unitContent = htmlToPlainText(unit.richTextContent || unit.description || '');
             return [
               new Paragraph({
                 heading: HeadingLevel.HEADING_3,
                 spacing: { before: 100, bottom: 50 },
                 children: [
-                  new TextRun({ text: `UNIT - ${unit.unitNumber}: ${unit.title}`, bold: true })
+                  new TextRun({ text: `UNIT - ${unit.unitNumber}`, bold: true })
                 ]
               }),
               new Paragraph({
                 spacing: { bottom: 100 },
-                children: [
-                  new TextRun({ text: "Topics: ", bold: true }),
-                  new TextRun({ text: (unit.topics || []).join(", ") })
-                ]
-              }),
-              unitPracticals.length > 0 ? new Paragraph({
-                spacing: { bottom: 100 },
-                children: [
-                  new TextRun({ text: "Practicals: ", bold: true }),
-                  new TextRun({ text: unitPracticals.map(p => p.title).join("; ") })
-                ]
-              }) : null
+                children: [new TextRun({ text: unitContent || 'Syllabus content not entered.' })]
+              })
             ].filter(Boolean);
           }).flat(),
           
