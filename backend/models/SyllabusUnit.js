@@ -23,6 +23,31 @@ const syllabusUnitSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  htmlContent: {
+    type: String,
+    default: '',
+  },
+  plainText: {
+    type: String,
+    default: '',
+  },
+  title: {
+    type: String,
+    default: '',
+  },
+  description: {
+    type: String,
+    default: '',
+  },
+  topics: [{ type: String }],
+  outcomes: {
+    type: String,
+    default: '',
+  },
+  hours: {
+    type: Number,
+    default: 0,
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

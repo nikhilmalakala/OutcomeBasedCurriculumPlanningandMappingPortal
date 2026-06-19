@@ -3,7 +3,13 @@ import mongoose from 'mongoose';
 const SyllabusUnitSchema = new mongoose.Schema({
   unitNumber: { type: Number, required: true },
   htmlContent: { type: String, default: '' },
+  richTextContent: { type: String, default: '' },
   plainText: { type: String, default: '' },
+  title: { type: String, default: '' },
+  description: { type: String, default: '' },
+  topics: [{ type: String }],
+  outcomes: { type: String, default: '' },
+  hours: { type: Number, default: 0 },
   lastUpdated: { type: Date, default: Date.now }
 });
 

@@ -32,15 +32,21 @@ const legacyUnitToHtml = (unit) => {
 const normalizeSyllabusUnits = (units = []) => units
   .slice(0, 5)
   .map((unit, index) => {
-    const richTextContent = stripUnsafeHtml(unit.richTextContent || legacyUnitToHtml(unit));
+    const richTextContent = stripUnsafeHtml(unit.htmlContent || unit.richTextContent || legacyUnitToHtml(unit));
+    const plainText = stripUnsafeHtml(unit.plainText || '')
+      .replace(/<[^>]+>/g, '')
+      .trim();
     return {
       unitNumber: unit.unitNumber || index + 1,
+      htmlContent: richTextContent,
       richTextContent,
+      plainText,
       title: unit.title || '',
       description: unit.description || '',
       topics: Array.isArray(unit.topics) ? unit.topics : [],
       outcomes: unit.outcomes || '',
       hours: Number.isFinite(Number(unit.hours)) ? Number(unit.hours) : 0,
+      lastUpdated: unit.lastUpdated || new Date(),
     };
   });
 
@@ -60,7 +66,14 @@ const syncStandaloneSyllabusUnits = async (versionId, updatedVersion, operatorUs
         },
         update: {
           $set: {
-            richTextContent: unit.richTextContent || '',
+            htmlContent: unit.htmlContent || unit.richTextContent || '',
+            richTextContent: unit.richTextContent || unit.htmlContent || '',
+            plainText: unit.plainText || '',
+            title: unit.title || '',
+            description: unit.description || '',
+            topics: unit.topics || [],
+            outcomes: unit.outcomes || '',
+            hours: unit.hours || 0,
             updatedBy: operatorUser.id,
           },
           $setOnInsert: {

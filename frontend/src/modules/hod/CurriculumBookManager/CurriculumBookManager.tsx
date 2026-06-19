@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Archive,
+  BarChart3,
   BookOpen,
   Check,
   Clock,
@@ -11,6 +12,7 @@ import {
   FileText,
   Maximize2,
   Plus,
+  RefreshCw,
   RotateCcw,
   Save,
   Search,
@@ -103,6 +105,8 @@ export const CurriculumBookManager = () => {
       setGeneratedUrl('');
       setPdfPage(1);
       setPdfZoom(100);
+      // Load credit summary in the background
+      setTimeout(() => fetchCreditSummary(bookRes.curriculumBook), 0);
     } catch (err) {
       console.error('Failed to fetch curriculum book details', err);
     } finally {
@@ -195,6 +199,30 @@ export const CurriculumBookManager = () => {
       alert(`Restore failed: ${err.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [creditSummary, setCreditSummary] = useState<any>(null);
+  const [creditLoading, setCreditLoading] = useState(false);
+
+  const fetchCreditSummary = async (book: any) => {
+    if (!book || !selectedDepartment?._id) return;
+    try {
+      setCreditLoading(true);
+      // Find regulation ID
+      const regCode = book.regulation;
+      const regRes = await api.regulations.list();
+      const reg = (regRes.regulations || []).find((r: any) => r.code === regCode);
+      if (!reg?._id) return;
+      const res = await api.curriculumBooks.creditSummary({
+        regulationId: reg._id,
+        departmentId: selectedDepartment._id
+      });
+      setCreditSummary(res);
+    } catch (err) {
+      console.error('Credit summary failed:', err);
+    } finally {
+      setCreditLoading(false);
     }
   };
 
@@ -534,18 +562,80 @@ export const CurriculumBookManager = () => {
           <div className="space-y-4">
             <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
-                <h3 className="text-sm font-bold text-slate-800">Generated Curriculum PDF Preview</h3>
-                <p className="text-xs text-slate-500 mt-1">Uses the same A4 curriculum book structure, headers, footer style, watermark, and academic table hierarchy.</p>
+                <h3 className="text-sm font-bold text-slate-800">Generate & Preview Curriculum Book PDF</h3>
+                <p className="text-xs text-slate-500 mt-1">Pixel-perfect A4 layout matching the official university curriculum format.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <button onClick={handleExportPdf} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-700">
-                  <FileDown className="w-4 h-4" /> Generate Print PDF
+                <button onClick={handleExportPdf} disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50">
+                  <FileDown className="w-4 h-4" /> Generate PDF (Puppeteer)
                 </button>
                 {generatedUrl && (
-                  <a href={generatedUrl} target="_blank" rel="noreferrer" className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm font-bold">Open Generated HTML</a>
+                  <a href={generatedUrl} target="_blank" rel="noreferrer" className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700">
+                    ⬇ Download PDF
+                  </a>
                 )}
               </div>
             </div>
+
+            {/* Credit Division Summary Panel */}
+            {creditSummary && (
+              <div className="bg-white rounded-xl border border-slate-200 p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <BarChart3 className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-bold text-slate-800 text-sm">Credit Division Summary — Live from Database</h3>
+                  <span className="ml-auto px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
+                    Total: {creditSummary.grandTotal} Credits
+                  </span>
+                </div>
+                <div className="overflow-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100">
+                        <th className="text-left px-3 py-2 font-bold border border-slate-200">Category</th>
+                        <th className="text-center px-3 py-2 font-bold border border-slate-200">Credits (DB)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(creditSummary.categoryTotals || {}).map(([cat, credits]: [string, any]) => (
+                        <tr key={cat} className="hover:bg-slate-50">
+                          <td className="px-3 py-2 border border-slate-200 font-semibold">{cat}</td>
+                          <td className="px-3 py-2 border border-slate-200 text-center font-bold text-blue-700">{credits}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-100 font-bold">
+                        <td className="px-3 py-2 border border-slate-200">Total</td>
+                        <td className="px-3 py-2 border border-slate-200 text-center text-emerald-700">{creditSummary.grandTotal}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-3 text-center text-xs">
+                  <div className="rounded-lg bg-blue-50 p-2 border border-blue-100">
+                    <p className="font-black text-blue-700">{creditSummary.fcCount}</p>
+                    <p className="text-blue-500 font-semibold">Foundation Courses (FC)</p>
+                    <p className="text-blue-600 font-bold">{creditSummary.fcCredits} credits</p>
+                  </div>
+                  <div className="rounded-lg bg-emerald-50 p-2 border border-emerald-100">
+                    <p className="font-black text-emerald-700">{creditSummary.icCount}</p>
+                    <p className="text-emerald-500 font-semibold">Intermediate Courses (IC)</p>
+                    <p className="text-emerald-600 font-bold">{creditSummary.icCredits} credits</p>
+                  </div>
+                  <div className="rounded-lg bg-purple-50 p-2 border border-purple-100">
+                    <p className="font-black text-purple-700">{creditSummary.acCount}</p>
+                    <p className="text-purple-500 font-semibold">Advanced Courses (AC)</p>
+                    <p className="text-purple-600 font-bold">{creditSummary.acCredits} credits</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {creditLoading && (
+              <div className="bg-white rounded-xl border border-slate-200 p-4 text-center text-sm text-slate-500">
+                <RefreshCw className="w-4 h-4 animate-spin inline mr-2" /> Loading credit summary...
+              </div>
+            )}
+
             <HighFidelityPdfTemplate book={selectedBook} sections={sections} />
           </div>
         )}

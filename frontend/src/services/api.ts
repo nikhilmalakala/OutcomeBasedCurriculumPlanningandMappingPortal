@@ -255,6 +255,11 @@ export const api = {
     versionHistory: (bookId: string) => apiRequest(`/api/curriculum-books/version/history?curriculumBookId=${bookId}`),
     createVersion: (body: any) => apiRequest('/api/curriculum-books/version/create', { method: 'POST', body: JSON.stringify(body) }),
     restoreVersion: (bookId: string, versionId: string) => apiRequest(`/api/curriculum-books/${bookId}/versions/${versionId}/restore`, { method: 'POST' }),
-    exportPdf: (body: any) => apiRequest('/api/curriculum-books/export/pdf', { method: 'POST', body: JSON.stringify(body) })
+    exportPdf: (body: any) => apiRequest('/api/curriculum-books/export/pdf', { method: 'POST', body: JSON.stringify(body) }),
+    livePreview: (curriculumBookId: string) => apiRequest(`/api/curriculum-books/live-preview?curriculumBookId=${curriculumBookId}`),
+    creditSummary: (params: any = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return apiRequest(`/api/curriculum-books/credit-summary?${qs}`);
+    },
   }
 };

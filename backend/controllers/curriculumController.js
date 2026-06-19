@@ -21,7 +21,7 @@ const formatVersion = (version) => ({
 });
 
 const buildCategorySummary = (versions) => {
-  const categories = ['MCC', 'MDC', 'AEC', 'SEC', 'VAC', 'SI', 'PROJ', 'MC', 'PC', 'ES', 'HS'];
+  const categories = ['MCC', 'MSC', 'UEC', 'MDC', 'AEC', 'SEC', 'VAC', 'SI', 'PROJ', 'MC', 'PC', 'ES', 'HS'];
   const semesterMap = new Map();
 
   versions.forEach((version) => {

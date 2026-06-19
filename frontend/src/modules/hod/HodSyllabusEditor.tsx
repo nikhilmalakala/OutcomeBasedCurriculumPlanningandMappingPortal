@@ -14,6 +14,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import adityaLogo from '../../assets/aditya-logo.png';
 import { RichTextEditor } from '../../components/common/RichTextEditor';
+import { PdfCoursePage, PdfCoursePageStyles } from '../../components/common/PdfCoursePage';
 
 const escapeHtml = (value = ''): string => String(value)
   .replace(/&/g, '&amp;')
@@ -691,6 +692,23 @@ export const HodSyllabusEditor: React.FC<HodSyllabusEditorProps> = ({ courseVers
 
   const renderAccreditationDocumentPreview = () => {
     if (!activeVersion) return null;
+    const departmentName = activeVersion.courseId?.departmentId?.name || user?.department?.name || 'Computer Science and Engineering';
+    const departmentCode = activeVersion.courseId?.departmentId?.code || user?.department?.code || 'CSE';
+    const regulationYear = activeVersion.regulationId?.academicYear || '2024';
+    return (
+      <>
+        <PdfCoursePageStyles />
+        <div className="bg-slate-400 p-4">
+          <PdfCoursePage
+            courseVersion={activeVersion}
+            departmentName={departmentName}
+            departmentCode={departmentCode}
+            regulationYear={regulationYear}
+            showFooter
+          />
+        </div>
+      </>
+    );
     return (
       <div
         className="bg-white mx-auto shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
@@ -2148,6 +2166,7 @@ export const HodSyllabusEditor: React.FC<HodSyllabusEditorProps> = ({ courseVers
                                     units[idx] = {
                                       ...units[idx],
                                       htmlContent: html,
+                                      richTextContent: html,
                                       plainText: plainText,
                                       lastUpdated: new Date().toISOString()
                                     };

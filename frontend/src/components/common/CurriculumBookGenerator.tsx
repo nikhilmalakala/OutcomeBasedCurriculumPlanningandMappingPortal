@@ -8,6 +8,7 @@ import {
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, BorderStyle, WidthType } from 'docx';
 // CODEx-added: Uses the existing university logo asset to match the reference PDF cover and page header style.
 import adityaLogo from '../../assets/aditya-logo.png';
+import { PdfCoursePage, PdfCoursePageStyles } from './PdfCoursePage';
 
 export const CurriculumBookGenerator: React.FC = () => {
   const { selectedProgram, selectedDepartment, selectedRegulation } = useContextStore();
@@ -287,57 +288,14 @@ export const CurriculumBookGenerator: React.FC = () => {
 
   // CODEx-added start: Renders one detailed syllabus entry in the compact reference-PDF format.
   const renderPdfSyllabusCourse = (v: any) => (
-    <PdfPage key={v._id}>
-      <div className="pdf-course-header">
-        <h3>{v.courseId?.title}</h3>
-        <p>{v.offeredFor?.length ? `(Common to ${v.offeredFor.join(', ')})` : `(For ${selectedDepartment?.name || 'Computer Science and Engineering'})`}</p>
-      </div>
-      <div className="pdf-course-meta">
-        <div><strong>Course Code:</strong> {v.courseId?.code || '-'}</div>
-        <table className="pdf-mini-table">
-          <thead><tr><th>L</th><th>T</th><th>P</th><th>C</th></tr></thead>
-          <tbody><tr><td>{v.credits?.L || 0}</td><td>{v.credits?.T || 0}</td><td>{v.credits?.P || 0}</td><td>{v.credits?.C || 0}</td></tr></tbody>
-        </table>
-      </div>
-      {v.courseOutcomes?.length > 0 && (
-        <div className="pdf-syllabus-section">
-          <h4>Course Outcomes:</h4>
-          <p><strong>At the end of the Course, Student will be able to:</strong></p>
-          {v.courseOutcomes.map((co: any) => (
-            <p key={co.coCode}><strong>{co.coCode}:</strong> {co.description}</p>
-          ))}
-        </div>
-      )}
-      {v.coPoMappings?.length > 0 && (
-        <div className="pdf-syllabus-section">
-          <h4>Mapping of Course Outcomes with Program Outcomes:</h4>
-          <table className="pdf-grid-table pdf-matrix-table">
-            <thead>
-              <tr><th>CO/PO</th>{[...Array(12)].map((_, i) => <th key={i}>PO {i + 1}</th>)}</tr>
-            </thead>
-            <tbody>
-              {v.courseOutcomes?.map((co: any) => {
-                const mapping = v.coPoMappings?.find((m: any) => m.coCode === co.coCode) || { po: {} };
-                return <tr key={co.coCode}><td>{co.coCode}</td>{[...Array(12)].map((_, i) => <td key={i}>{mapping.po[`PO${i + 1}`] || ''}</td>)}</tr>;
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {v.syllabusUnits?.map((unit: any) => (
-        <div key={unit.unitNumber} className="pdf-unit-block">
-          <h4>UNIT - {unit.unitNumber}</h4>
-          <p><strong>{unit.title}:</strong> {unit.description || unit.topics?.join(', ')}</p>
-          {unit.topics?.length > 0 && <p>{unit.topics.join(', ')}</p>}
-        </div>
-      ))}
-      {(v.textbooks?.length > 0 || v.referenceMaterials?.length > 0) && (
-        <div className="pdf-syllabus-section">
-          {v.textbooks?.length > 0 && <p><strong>Text Books:</strong> {v.textbooks.map((tb: any) => typeof tb === 'string' ? tb : tb.title).join('; ')}</p>}
-          {v.referenceMaterials?.length > 0 && <p><strong>Reference Books:</strong> {v.referenceMaterials.map((ref: any) => typeof ref === 'string' ? ref : ref.title).join('; ')}</p>}
-        </div>
-      )}
-    </PdfPage>
+    <PdfCoursePage
+      key={v._id}
+      courseVersion={v}
+      departmentName={selectedDepartment?.name || 'Computer Science and Engineering'}
+      departmentCode={selectedDepartment?.code || 'CSE'}
+      regulationYear={selectedRegulation?.academicYear || '2024'}
+      forcePageBreak
+    />
   );
   // CODEx-added end
 
@@ -369,6 +327,7 @@ export const CurriculumBookGenerator: React.FC = () => {
 
       {/* Main Preview Container */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-12 max-w-[900px] mx-auto print:p-0 print:border-0 print:shadow-none print-layout" id="curriculum-handbook-print-root">
+        <PdfCoursePageStyles />
         {/* CODEx-added start: Program/regulation handbook header, footer, and watermark applied to printed preview. */}
         {resolvedBookLayout.headerText && (
           <div className="print-book-header hidden print:block">

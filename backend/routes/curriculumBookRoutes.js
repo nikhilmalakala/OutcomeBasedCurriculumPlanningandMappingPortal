@@ -42,6 +42,8 @@ router.get('/list', curriculumBookController.listCurriculums);
 router.get('/version/history', curriculumBookController.getVersionHistory);
 router.post('/version/create', authorizeRoles('HOD', 'Admin'), curriculumBookController.createVersion);
 router.post('/export/pdf', authorizeRoles('HOD', 'Admin'), curriculumBookController.exportPdf);
+router.get('/live-preview', curriculumBookController.livePreview);
+router.get('/credit-summary', curriculumBookController.creditSummary);
 
 router.get('/:id', curriculumBookController.getCurriculum);
 router.put('/:id', authorizeRoles('HOD', 'Admin'), curriculumBookController.updateCurriculum);

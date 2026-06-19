@@ -105,12 +105,15 @@ export const updateCourseVersionSchema = z.object({
 
   syllabusUnits: z.array(z.object({
     unitNumber: z.number().int().min(1).max(5),
+    htmlContent: z.string().optional(),
     richTextContent: z.string().optional(),
+    plainText: z.string().optional(),
     title: z.string().optional(),
     description: z.string().optional(),
     topics: z.array(z.string()).optional(),
     outcomes: z.string().optional(),
-    hours: z.number().int().min(0).max(30).optional()
+    hours: z.number().int().min(0).max(30).optional(),
+    lastUpdated: z.string().optional()
   })).optional(),
 
   labPracticals: z.array(z.object({
