@@ -112,7 +112,7 @@ const getLogoBuffer = () => {
 const getMappingValue = (mapping, key) => {
   const source = mapping instanceof Map ? Object.fromEntries(mapping.entries()) : (mapping || {});
   const value = Number(source[key] || 0);
-  return (Number.isFinite(value) && value > 0) ? String(value) : '';
+  return (Number.isFinite(value) && value > 0) ? String(value) : '-';
 };
 
 const deriveMappingColumns = (mappings = [], mapKey, prefix, fallback) => {

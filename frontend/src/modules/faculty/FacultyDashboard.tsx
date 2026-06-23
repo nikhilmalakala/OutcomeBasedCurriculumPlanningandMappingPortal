@@ -94,6 +94,73 @@ export const FacultyDashboard: React.FC<FacultyDashboardProps> = ({ activeTab, s
   const [regFilter, setRegFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
 
+  // Synchronize regFilter with selectedRegulation on change
+  useEffect(() => {
+    if (selectedRegulation?.code) {
+      setRegFilter(selectedRegulation.code);
+    }
+  }, [selectedRegulation]);
+
+  const handleRegChange = (regCode: string) => {
+    setRegFilter(regCode);
+    const matchedReg = regulations.find(r => r.code === regCode);
+    if (matchedReg) {
+      setSelectedRegulation(matchedReg);
+    }
+  };
+
+  // Filtered approved courses for Course File Viewer
+  const filteredCourses = approvedCourses.filter(item => {
+    // 1. Department Filter
+    if (deptFilter !== 'All') {
+      const itemDeptCode = item.courseId?.departmentId?.code || item.courseId?.department?.code || '';
+      if (itemDeptCode.toLowerCase() !== deptFilter.toLowerCase()) {
+        return false;
+      }
+    }
+
+    // 2. Semester Filter
+    if (semFilter !== 'All') {
+      if (String(item.semester) !== String(semFilter)) {
+        return false;
+      }
+    }
+
+    // 3. Regulation Filter
+    if (regFilter !== 'All') {
+      const itemRegCode = item.regulationId?.code || selectedRegulation?.code || '';
+      if (itemRegCode.toLowerCase() !== regFilter.toLowerCase()) {
+        return false;
+      }
+    }
+
+    // 4. Course Type (Level) Filter
+    if (typeFilter !== 'All') {
+      const itemLevel = item.level || '';
+      if (itemLevel.toLowerCase() !== typeFilter.toLowerCase()) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  const semesters = Array.from(new Set(approvedCourses.map(item => item.semester))).sort((a, b) => a - b);
+
+  // Synchronize selectedCourseCode when filteredCourses list changes
+  useEffect(() => {
+    if (activeTab === 'course-file') {
+      if (filteredCourses.length > 0) {
+        const exists = filteredCourses.some(item => item.courseId?.code === selectedCourseCode);
+        if (!exists) {
+          setSelectedCourseCode(filteredCourses[0].courseId?.code || '');
+        }
+      } else {
+        setSelectedCourseCode('');
+      }
+    }
+  }, [deptFilter, semFilter, regFilter, typeFilter, approvedCourses, activeTab]);
+
   // Notifications Category filter state
   const [activeNotifTab, setActiveNotifTab] = useState<'All' | 'Updates' | 'Announcements' | 'System'>('All');
 
@@ -303,370 +370,433 @@ export const FacultyDashboard: React.FC<FacultyDashboardProps> = ({ activeTab, s
       {/* ============================================================== */}
       {/* 2. COURSE FILE VIEWER PAGE */}
       {/* ============================================================== */}
-      {activeTab === 'course-file' && (
-        <div className="space-y-6 animate-fadeIn">
-          <div>
-            <h1 className="text-xl font-extrabold text-slate-800 font-sans">Course File Viewer</h1>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-            
-            {/* Left Filter Card */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">FILTERS</h3>
-              
-              <div className="space-y-3.5 text-xs font-bold text-slate-500">
-                <div className="space-y-1">
-                  <span>Department</span>
-                  <select 
-                    value={deptFilter} 
-                    onChange={(e) => setDeptFilter(e.target.value)} 
-                    className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="All">All</option>
-                    <option value="All">All Departments</option>
-                    <option value="CSE">Computer Science</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <span>Semester</span>
-                  <select 
-                    value={semFilter} 
-                    onChange={(e) => setSemFilter(e.target.value)} 
-                    className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="All">All</option>
-                    <option value="3">Semester 3</option>
-                    <option value="4">Semester 4</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <span>Regulation</span>
-                  <select 
-                    value={regFilter} 
-                    onChange={(e) => setRegFilter(e.target.value)} 
-                    className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="All">All</option>
-                    <option value="R2023">R2023</option>
-                    <option value="R2025">R2025</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <span>Course Type</span>
-                  <select 
-                    value={typeFilter} 
-                    onChange={(e) => setTypeFilter(e.target.value)} 
-                    className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="All">All</option>
-                    <option value="Theory">Theory</option>
-                    <option value="Lab">Practical Lab</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Informational banner */}
-              <div className="bg-blue-50/50 border border-blue-200/60 p-3.5 rounded-xl text-[10px] text-blue-600 font-semibold leading-relaxed">
-                Faculty access is read-only. Edit, delete, approval, and upload actions are restricted by RBAC.
-              </div>
+      {activeTab === 'course-file' && (() => {
+        const activeCourse = filteredCourses.find(item => item.courseId?.code === selectedCourseCode) || filteredCourses[0];
+        return (
+          <div className="space-y-6 animate-fadeIn">
+            <div>
+              <h1 className="text-xl font-extrabold text-slate-800 font-sans">Course File Viewer</h1>
             </div>
 
-            {/* Right Course Panel */}
-            <div className="md:col-span-3 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
               
-              {/* Header block */}
-              <div className="flex justify-between items-start border-b border-slate-100 pb-4">
-                {(() => {
-                  const c = approvedCourses.find(item => item.courseId?.code === selectedCourseCode) || approvedCourses[0];
-                  
-                  if (!c) return <div>No course selected</div>;
+              {/* Left Filter Card */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">FILTERS</h3>
+                
+                <div className="space-y-3.5 text-xs font-bold text-slate-500">
+                  <div className="space-y-1">
+                    <span>Regulation</span>
+                    <select 
+                      value={regFilter} 
+                      onChange={(e) => handleRegChange(e.target.value)} 
+                      className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="All">All</option>
+                      {regulations.map(reg => (
+                        <option key={reg._id} value={reg.code}>{reg.code}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                  const fmt = (v: number | undefined) => (v === 0 || !v) ? '-' : v;
-                  const creditsC = fmt(c.credits?.C);
-                  const l = fmt(c.credits?.L);
-                  const t = fmt(c.credits?.T);
-                  const p = fmt(c.credits?.P);
-                  const s = fmt(c.credits?.S);
-                  
-                  return (
-                    <>
-                      <div>
-                        <h2 className="text-base font-extrabold text-slate-800">{c.courseId?.code} - {c.courseId?.title}</h2>
-                        <p className="text-[11px] text-slate-400 font-semibold mt-0.5">{selectedDepartment?.code || 'Dept'} / Semester {c.semester} / {selectedRegulation?.code || 'Reg'}</p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 rounded text-[9px] font-bold text-emerald-700 uppercase tracking-wider">
-                          Finalized
-                        </span>
-                        <div className="text-right font-sans">
-                          <span className="block text-[8px] font-bold text-slate-400 leading-none">L  T  P  S  C</span>
-                          <strong className="block text-xs text-slate-700 leading-none mt-1.5 font-mono">{l}  {t}  {p}  {s}  {creditsC}</strong>
-                        </div>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
+                  <div className="space-y-1">
+                    <span>Department</span>
+                    <select 
+                      value={deptFilter} 
+                      onChange={(e) => setDeptFilter(e.target.value)} 
+                      className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="All">All Departments</option>
+                      {departments.map(dept => (
+                        <option key={dept._id} value={dept.code}>{dept.name}</option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div className="text-xs font-bold text-slate-700 space-y-1">
-                <span>Course Code: {selectedCourseCode}</span>
-              </div>
+                  <div className="space-y-1">
+                    <span>Semester</span>
+                    <select 
+                      value={semFilter} 
+                      onChange={(e) => setSemFilter(e.target.value)} 
+                      className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="All">All Semesters</option>
+                      {semesters.map(sem => (
+                        <option key={sem} value={String(sem)}>Semester {sem}</option>
+                      ))}
+                    </select>
+                  </div>
 
-              {/* Course outcomes definitions list */}
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Course Outcomes:</h4>
-                <p className="text-[11px] text-slate-500 font-medium">At the end of the course, student will be able to:</p>
-                <div className="space-y-2 pt-1 font-medium text-slate-600 text-xs">
-                  {(() => {
-                    const c = approvedCourses.find(item => item.courseId?.code === selectedCourseCode) || approvedCourses[0];
-                    const outcomes = c?.courseOutcomes || [];
-                    if (outcomes.length === 0) return <p className="text-slate-400 italic">No Course Outcomes defined.</p>;
-                    return outcomes.map((co: any) => (
-                      <div key={co.coCode} className="flex gap-2 leading-relaxed">
-                        <strong className="text-blue-900 font-bold flex-shrink-0 w-8">{co.coCode}:</strong>
-                        <span>{co.description}</span>
-                      </div>
-                    ));
-                  })()}
+                  <div className="space-y-1">
+                    <span>Course Type</span>
+                    <select 
+                      value={typeFilter} 
+                      onChange={(e) => setTypeFilter(e.target.value)} 
+                      className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="All">All</option>
+                      <option value="Foundation">Foundation Course</option>
+                      <option value="Intermediate">Intermediate Course</option>
+                      <option value="Advanced">Advanced Course</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span>Course Name</span>
+                    <select 
+                      value={selectedCourseCode} 
+                      onChange={(e) => setSelectedCourseCode(e.target.value)} 
+                      className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+                    >
+                      {filteredCourses.length === 0 ? (
+                        <option value="">No courses matching filters</option>
+                      ) : (
+                        filteredCourses.map(item => (
+                          <option key={item._id} value={item.courseId?.code}>
+                            {item.courseId?.code} - {item.courseId?.title}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Mappings Matrix Readonly Table */}
-              <div className="space-y-3 pt-2">
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                  Mapping of Course Outcomes with Program Outcomes (PO) and Program Specific Outcomes (PSO):
-                </h4>
-                
-                <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                  <table className="w-full text-center border-collapse text-[10px]">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-400 uppercase font-bold font-sans">
-                        <th className="p-2.5 border-r border-slate-200 text-left pl-3 font-extrabold w-16">CO/PO</th>
-                        {Array.from({ length: 12 }, (_, i) => `PO ${i + 1}`).map(po => (
-                          <th key={po} className="p-2 border-r border-slate-200 font-semibold">{po}</th>
-                        ))}
-                        {Array.from({ length: 3 }, (_, i) => `PSO ${i + 1}`).map(pso => (
-                          <th key={pso} className="p-2 border-r border-slate-200 text-blue-900 font-bold bg-blue-50/20">{pso}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
+              {/* Right Course Panel */}
+              <div className="md:col-span-3 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                {!activeCourse ? (
+                  <div className="text-center py-16 text-slate-500">
+                    <BookOpen className="w-16 h-16 mx-auto text-slate-300 mb-4 stroke-[1.5]" />
+                    <h3 className="font-extrabold text-slate-800 text-sm">No courses matching filters</h3>
+                    <p className="text-xs text-slate-400 mt-1">Try adjusting the Department, Semester, Regulation, or Course Type filters on the left.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Header block */}
+                    <div className="flex justify-between items-start border-b border-slate-100 pb-4">
                       {(() => {
-                        const c = approvedCourses.find(item => item.courseId?.code === selectedCourseCode) || approvedCourses[0];
-                        if (!c) return null;
+                        const fmt = (v: number | undefined) => (v === 0 || !v) ? '-' : v;
+                        const creditsC = fmt(activeCourse.credits?.C);
+                        const l = fmt(activeCourse.credits?.L);
+                        const t = fmt(activeCourse.credits?.T);
+                        const p = fmt(activeCourse.credits?.P);
+                        const s = fmt(activeCourse.credits?.S);
                         
-                        const coMap = c.coPoMappings || [];
-                        const psoMap = c.coPsoMappings || [];
-                        const coCodes = c.courseOutcomes?.map((co: any) => co.coCode) || ['CO1', 'CO2', 'CO3', 'CO4', 'CO5'];
-
-                        return coCodes.map((coCode: string) => {
-                          const poData = coMap.find((m: any) => m.coCode === coCode)?.po || {};
-                          const psoData = psoMap.find((m: any) => m.coCode === coCode)?.pso || {};
-                          
-                          return (
-                            <tr key={coCode} className="border-b border-slate-100 hover:bg-slate-50/20 font-bold text-slate-700 font-mono">
-                              <td className="p-2.5 border-r border-slate-200 text-left pl-3 font-sans text-xs text-blue-900 font-black">
-                                {coCode}
-                              </td>
-                              {Array.from({ length: 12 }, (_, i) => `PO${i + 1}`).map(po => {
-                                const val = poData[po] || 0;
-                                const bg = val === 3 ? 'bg-emerald-50 text-emerald-700' :
-                                           val === 2 ? 'bg-blue-50/50 text-blue-700' :
-                                           val === 1 ? 'bg-slate-50 text-slate-500' : 'text-slate-300';
-                                return (
-                                  <td key={po} className={`p-2 border-r border-slate-150 ${bg}`}>
-                                    {val > 0 ? val : '—'}
-                                  </td>
-                                );
-                              })}
-                              {Array.from({ length: 3 }, (_, i) => `PSO${i + 1}`).map(pso => {
-                                const val = psoData[pso] || 0;
-                                const bg = val === 3 ? 'bg-emerald-50 text-emerald-700' :
-                                           val === 2 ? 'bg-blue-50/50 text-blue-700' :
-                                           val === 1 ? 'bg-slate-50 text-slate-500' : 'text-slate-300';
-                                return (
-                                  <td key={pso} className={`p-2 border-r border-slate-150 bg-blue-50/10 ${bg}`}>
-                                    {val > 0 ? val : '—'}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          );
-                        });
+                        return (
+                          <>
+                            <div>
+                              <h2 className="text-base font-extrabold text-slate-800">{activeCourse.courseId?.code} - {activeCourse.courseId?.title}</h2>
+                              <p className="text-[11px] text-slate-400 font-semibold mt-0.5">{selectedDepartment?.code || 'Dept'} / Semester {activeCourse.semester} / {selectedRegulation?.code || 'Reg'}</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 rounded text-[9px] font-bold text-emerald-700 uppercase tracking-wider">
+                                Finalized
+                              </span>
+                              <div className="text-right font-sans">
+                                <span className="block text-[8px] font-bold text-slate-400 leading-none">L  T  P  S  C</span>
+                                <strong className="block text-xs text-slate-700 leading-none mt-1.5 font-mono">{l}  {t}  {p}  {s}  {creditsC}</strong>
+                              </div>
+                            </div>
+                          </>
+                        );
                       })()}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                    </div>
 
-              {/* Descriptions Reference panel */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5 border-b border-slate-200 pb-2">
-                  <Award className="w-4 h-4 text-blue-800" />
-                  <span>Program Outcomes (PO) & PSO Reference Descriptions</span>
-                </h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-[10px]">
-                  
-                  {/* Left Column POs */}
-                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                    <span className="font-bold text-slate-400 uppercase tracking-wider block">Core Program Outcomes (POs)</span>
-                    {programOutcomes.map((po) => (
-                      <div key={po.code} className="space-y-0.5 leading-normal">
-                        <strong className="text-slate-800 font-bold block">{po.code}: {po.title}</strong>
-                        <p className="text-slate-500 font-medium">{po.desc}</p>
+                    <div className="text-xs font-bold text-slate-700 space-y-1">
+                      <span>Course Code: {activeCourse.courseId?.code}</span>
+                    </div>
+
+                    {/* Course outcomes definitions list */}
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Course Outcomes:</h4>
+                      <p className="text-[11px] text-slate-500 font-medium">At the end of the course, student will be able to:</p>
+                      <div className="space-y-2 pt-1 font-medium text-slate-600 text-xs">
+                        {(() => {
+                          const outcomes = activeCourse.courseOutcomes || [];
+                          if (outcomes.length === 0) return <p className="text-slate-400 italic">No Course Outcomes defined.</p>;
+                          return outcomes.map((co: any) => (
+                            <div key={co.coCode} className="flex gap-2 leading-relaxed">
+                              <strong className="text-blue-900 font-bold flex-shrink-0 w-8">{co.coCode}:</strong>
+                              <span>{co.description}</span>
+                            </div>
+                          ));
+                        })()}
                       </div>
-                    ))}
-                  </div>
+                    </div>
 
-                  {/* Right Column PSOs */}
-                  <div className="space-y-3">
-                    <span className="font-bold text-slate-400 uppercase tracking-wider block">Program Specific Outcomes (PSOs)</span>
-                    {programSpecificOutcomes.map((pso) => (
-                      <div key={pso.code} className="space-y-0.5 leading-normal">
-                        <strong className="text-blue-900 font-bold block">{pso.code}: {pso.title}</strong>
-                        <p className="text-slate-500 font-medium">{pso.desc}</p>
+                    {/* Mappings Matrix Readonly Table */}
+                    <div className="space-y-3 pt-2">
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                        Mapping of Course Outcomes with Program Outcomes (PO) and Program Specific Outcomes (PSO):
+                      </h4>
+                      
+                      <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                        <table className="w-full text-center border-collapse text-[10px]">
+                          <thead>
+                            <tr className="border-b border-slate-200 bg-slate-50 text-slate-400 uppercase font-bold font-sans">
+                              <th className="p-2.5 border-r border-slate-200 text-left pl-3 font-extrabold w-16">CO/PO</th>
+                              {Array.from({ length: 12 }, (_, i) => `PO ${i + 1}`).map(po => (
+                                <th key={po} className="p-2 border-r border-slate-200 font-semibold">{po}</th>
+                              ))}
+                              {Array.from({ length: 3 }, (_, i) => `PSO ${i + 1}`).map(pso => (
+                                <th key={pso} className="p-2 border-r border-slate-200 text-blue-900 font-bold bg-blue-50/20">{pso}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(() => {
+                              const coMap = activeCourse.coPoMappings || [];
+                              const psoMap = activeCourse.coPsoMappings || [];
+                              const coCodes = activeCourse.courseOutcomes?.map((co: any) => co.coCode) || ['CO1', 'CO2', 'CO3', 'CO4', 'CO5'];
+
+                              return coCodes.map((coCode: string) => {
+                                const poData = coMap.find((m: any) => m.coCode === coCode)?.po || {};
+                                const psoData = psoMap.find((m: any) => m.coCode === coCode)?.pso || {};
+                                
+                                return (
+                                  <tr key={coCode} className="border-b border-slate-100 hover:bg-slate-50/20 font-bold text-slate-700 font-mono">
+                                    <td className="p-2.5 border-r border-slate-200 text-left pl-3 font-sans text-xs text-blue-900 font-black">
+                                      {coCode}
+                                    </td>
+                                    {Array.from({ length: 12 }, (_, i) => `PO${i + 1}`).map(po => {
+                                      const val = poData[po] || 0;
+                                      const bg = val === 3 ? 'bg-emerald-50 text-emerald-700' :
+                                                 val === 2 ? 'bg-blue-50/50 text-blue-700' :
+                                                 val === 1 ? 'bg-slate-50 text-slate-500' : 'text-slate-300';
+                                      return (
+                                        <td key={po} className={`p-2 border-r border-slate-150 ${bg}`}>
+                                          {val > 0 ? val : '-'}
+                                        </td>
+                                      );
+                                    })}
+                                    {Array.from({ length: 3 }, (_, i) => `PSO${i + 1}`).map(pso => {
+                                      const val = psoData[pso] || 0;
+                                      const bg = val === 3 ? 'bg-emerald-50 text-emerald-700' :
+                                                 val === 2 ? 'bg-blue-50/50 text-blue-700' :
+                                                 val === 1 ? 'bg-slate-50 text-slate-500' : 'text-slate-300';
+                                      return (
+                                        <td key={pso} className={`p-2 border-r border-slate-150 bg-blue-50/10 ${bg}`}>
+                                          {val > 0 ? val : '-'}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                );
+                              });
+                            })()}
+                          </tbody>
+                        </table>
                       </div>
-                    ))}
-                  </div>
+                    </div>
 
-                </div>
+                    {/* Descriptions Reference panel */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+                      <h4 className="text-[10px] font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5 border-b border-slate-200 pb-2">
+                        <Award className="w-4 h-4 text-blue-800" />
+                        <span>Program Outcomes (PO) & PSO Reference Descriptions</span>
+                      </h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-[10px]">
+                        
+                        {/* Left Column POs */}
+                        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                          <span className="font-bold text-slate-400 uppercase tracking-wider block">Core Program Outcomes (POs)</span>
+                          {programOutcomes.map((po) => (
+                            <div key={po.code} className="space-y-0.5 leading-normal">
+                              <strong className="text-slate-800 font-bold block">{po.code}: {po.title}</strong>
+                              <p className="text-slate-500 font-medium">{po.desc}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Right Column PSOs */}
+                        <div className="space-y-3">
+                          <span className="font-bold text-slate-400 uppercase tracking-wider block">Program Specific Outcomes (PSOs)</span>
+                          {programSpecificOutcomes.map((pso) => (
+                            <div key={pso.code} className="space-y-0.5 leading-normal">
+                              <strong className="text-blue-900 font-bold block">{pso.code}: {pso.title}</strong>
+                              <p className="text-slate-500 font-medium">{pso.desc}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
-
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ============================================================== */}
       {/* 3. SYLLABUS VIEWER PAGE */}
       {/* ============================================================== */}
-      {activeTab === 'syllabus-view' && (
-        <div className="space-y-6 animate-fadeIn">
-          <div>
-            <h1 className="text-xl font-extrabold text-slate-800 font-sans">Syllabus Viewer</h1>
-            <p className="text-xs text-slate-500 mt-1 font-semibold">Browse approved unit-wise syllabi, references, practicals, and course outcomes.</p>
-          </div>
+      {activeTab === 'syllabus-view' && (() => {
+        const activeCourse = filteredCourses.find(item => item.courseId?.code === selectedCourseCode) || filteredCourses[0];
+        return (
+          <div className="space-y-6 animate-fadeIn">
+            <div>
+              <h1 className="text-xl font-extrabold text-slate-800 font-sans">Syllabus Viewer</h1>
+              <p className="text-xs text-slate-500 mt-1 font-semibold">Browse approved unit-wise syllabi, references, practicals, and course outcomes.</p>
+            </div>
 
-          {/* Top Filters bar */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-bold text-slate-500">
-            <div className="space-y-1">
-              <span>Department</span>
-              <select className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none">
-                <option>CSE</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <span>Course</span>
-              <select 
-                value={selectedCourseCode}
-                onChange={(e) => setSelectedCourseCode(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-blue-500"
-              >
-                {approvedCourses.map(item => (
-                  <option key={item._id} value={item.courseId?.code}>{item.courseId?.code} - {item.courseId?.title}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <span>Regulation</span>
-              <select className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none">
-                <option>R2023</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Split grid layout */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-            
-            {/* Left Units list */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-              <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">UNITS</h4>
+            {/* Top Filters bar */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs font-bold text-slate-500">
+              <div className="space-y-1">
+                <span>Regulation</span>
+                <select 
+                  value={regFilter} 
+                  onChange={(e) => handleRegChange(e.target.value)} 
+                  className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="All">All</option>
+                  {regulations.map(reg => (
+                    <option key={reg._id} value={reg.code}>{reg.code}</option>
+                  ))}
+                </select>
+              </div>
               
-              <div className="space-y-2">
-                {(() => {
-                  const c = approvedCourses.find(item => item.courseId?.code === selectedCourseCode) || approvedCourses[0];
-                  const units = c?.syllabusUnits || [];
-                  if (units.length === 0) return <p className="text-slate-400 italic">No units defined.</p>;
-                  return units.map((u: any, idx: number) => (
-                    <div 
-                      key={u._id || idx}
-                      onClick={() => setSelectedUnit(u.unitNumber)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer text-left space-y-1 ${
-                        selectedUnit === u.unitNumber 
-                          ? 'border-blue-600 bg-blue-50/10' 
-                          : 'border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <span className={`text-[11px] font-bold block ${selectedUnit === u.unitNumber ? 'text-blue-900' : 'text-slate-700'}`}>
-                        Unit {u.unitNumber}: {u.title}
-                      </span>
-                      <span className="text-[9px] text-slate-400 font-semibold block font-mono">{u.hours || 10} contact hours</span>
-                    </div>
-                  ));
-                })()}
+              <div className="space-y-1">
+                <span>Department</span>
+                <select 
+                  value={deptFilter} 
+                  onChange={(e) => setDeptFilter(e.target.value)} 
+                  className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="All">All Departments</option>
+                  {departments.map(dept => (
+                    <option key={dept._id} value={dept.code}>{dept.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <span>Semester</span>
+                <select 
+                  value={semFilter} 
+                  onChange={(e) => setSemFilter(e.target.value)} 
+                  className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="All">All Semesters</option>
+                  {semesters.map(sem => (
+                    <option key={sem} value={String(sem)}>Semester {sem}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <span>Course</span>
+                <select 
+                  value={selectedCourseCode}
+                  onChange={(e) => setSelectedCourseCode(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-2 text-slate-700 bg-white font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-blue-500"
+                >
+                  {filteredCourses.length === 0 ? (
+                    <option value="">No courses matching filters</option>
+                  ) : (
+                    filteredCourses.map(item => (
+                      <option key={item._id} value={item.courseId?.code}>{item.courseId?.code} - {item.courseId?.title}</option>
+                    ))
+                  )}
+                </select>
               </div>
             </div>
 
-            {/* Right details card */}
-            <div className="md:col-span-3 space-y-6">
-              
-              {/* Unit Content card */}
-              {(() => {
-                const c = approvedCourses.find(item => item.courseId?.code === selectedCourseCode) || approvedCourses[0];
-                const units = c?.syllabusUnits || [];
-                const unit = units.find((u: any) => u.unitNumber === selectedUnit) || units[0];
+            {/* Split grid layout */}
+            {!activeCourse ? (
+              <div className="bg-white p-12 rounded-2xl border border-slate-200 shadow-sm text-center text-slate-500">
+                <BookOpen className="w-16 h-16 mx-auto text-slate-300 mb-4 stroke-[1.5]" />
+                <h3 className="font-extrabold text-slate-800 text-sm">No courses matching filters</h3>
+                <p className="text-xs text-slate-400 mt-1">Try adjusting the Regulation, Department, or Semester filters above.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
                 
-                if (!unit) return <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center text-slate-500 font-semibold">Select a unit to view details.</div>;
+                {/* Left Units list */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">UNITS</h4>
+                  
+                  <div className="space-y-2">
+                    {(() => {
+                      const units = activeCourse.syllabusUnits || [];
+                      if (units.length === 0) return <p className="text-slate-400 italic">No units defined.</p>;
+                      return units.map((u: any, idx: number) => (
+                        <div 
+                          key={u._id || idx}
+                          onClick={() => setSelectedUnit(u.unitNumber)}
+                          className={`p-3 rounded-xl border transition-all cursor-pointer text-left space-y-1 ${
+                            selectedUnit === u.unitNumber 
+                              ? 'border-blue-600 bg-blue-50/10' 
+                              : 'border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span className={`text-[11px] font-bold block ${selectedUnit === u.unitNumber ? 'text-blue-900' : 'text-slate-700'}`}>
+                            Unit {u.unitNumber}: {u.title}
+                          </span>
+                          <span className="text-[9px] text-slate-400 font-semibold block font-mono">{u.hours || 10} contact hours</span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
 
-                return (
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 relative">
-                    <span className="absolute top-4 right-4 px-2 py-0.5 bg-slate-100 text-slate-455 border border-slate-250 rounded text-[9px] font-bold font-mono">
-                      Unit {unit.unitNumber}
-                    </span>
+                {/* Right details card */}
+                <div className="md:col-span-3 space-y-6">
+                  
+                  {/* Unit Content card */}
+                  {(() => {
+                    const units = activeCourse.syllabusUnits || [];
+                    const unit = units.find((u: any) => u.unitNumber === selectedUnit) || units[0];
+                    
+                    if (!unit) return <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center text-slate-500 font-semibold">Select a unit to view details.</div>;
 
-                    <div className="space-y-1 border-b border-slate-100 pb-3">
-                      <h3 className="text-base font-extrabold text-slate-800">{unit.title}</h3>
-                      <p className="text-[10px] text-slate-455 font-semibold uppercase tracking-wide">
-                        {`${c?.courseId?.code} / ${c?.courseId?.title}`}
-                      </p>
-                    </div>
+                    return (
+                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 relative">
+                        <span className="absolute top-4 right-4 px-2 py-0.5 bg-slate-100 text-slate-455 border border-slate-250 rounded text-[9px] font-bold font-mono">
+                          Unit {unit.unitNumber}
+                        </span>
 
-                    <div className="text-xs font-semibold text-slate-600 leading-relaxed space-y-4">
-                      <p className="pl-3 border-l-2 border-blue-600">{unit.description}</p>
-                      <p>{unit.topics?.join(', ')}</p>
+                        <div className="space-y-1 border-b border-slate-100 pb-3">
+                          <h3 className="text-base font-extrabold text-slate-800">{unit.title}</h3>
+                          <p className="text-[10px] text-slate-455 font-semibold uppercase tracking-wide">
+                            {`${activeCourse.courseId?.code} / ${activeCourse.courseId?.title}`}
+                          </p>
+                        </div>
+
+                        <div className="text-xs font-semibold text-slate-600 leading-relaxed space-y-4">
+                          <p className="pl-3 border-l-2 border-blue-600">{unit.description}</p>
+                          <p>{unit.topics?.join(', ')}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Textbooks list card */}
+                  <div className="bg-emerald-50/20 border border-emerald-250 rounded-2xl p-6 space-y-3.5">
+                    <h4 className="text-xs font-bold text-emerald-800 uppercase tracking-wide flex items-center gap-1.5 border-b border-emerald-100 pb-2">
+                      <BookOpen className="w-4 h-4 text-emerald-700" />
+                      <span>Textbooks</span>
+                    </h4>
+                    
+                    <div className="space-y-2 text-xs font-bold text-emerald-900 leading-relaxed">
+                      {(() => {
+                        const textbooks = activeCourse.textbooks || [];
+                        if (textbooks.length === 0) return <p className="text-emerald-700 italic font-semibold">No textbooks defined.</p>;
+                        return textbooks.map((bk: any, idx: number) => (
+                          <p key={idx} className="font-semibold">{`${idx + 1}. ${bk.title || bk}${bk.author ? `, ${bk.author}` : ''}${bk.publisher ? `, ${bk.publisher}` : ''}`}</p>
+                        ));
+                      })()}
                     </div>
                   </div>
-                );
-              })()}
 
-              {/* Textbooks list card */}
-              <div className="bg-emerald-50/20 border border-emerald-250 rounded-2xl p-6 space-y-3.5">
-                <h4 className="text-xs font-bold text-emerald-800 uppercase tracking-wide flex items-center gap-1.5 border-b border-emerald-100 pb-2">
-                  <BookOpen className="w-4 h-4 text-emerald-700" />
-                  <span>Textbooks</span>
-                </h4>
-                
-                <div className="space-y-2 text-xs font-bold text-emerald-900 leading-relaxed">
-                  {(() => {
-                    const c = approvedCourses.find(item => item.courseId?.code === selectedCourseCode) || approvedCourses[0];
-                    const textbooks = c?.textbooks || [];
-                    if (textbooks.length === 0) return <p className="text-emerald-700 italic font-semibold">No textbooks defined.</p>;
-                    return textbooks.map((bk: any, idx: number) => (
-                      <p key={idx} className="font-semibold">{`${idx + 1}. ${bk.title || bk}${bk.author ? `, ${bk.author}` : ''}${bk.publisher ? `, ${bk.publisher}` : ''}`}</p>
-                    ));
-                  })()}
                 </div>
               </div>
-
-            </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ============================================================== */}
       {/* 4.5 CURRICULUM BOOK */}

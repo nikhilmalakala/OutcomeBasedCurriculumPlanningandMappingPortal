@@ -834,7 +834,7 @@ export const HodSyllabusEditor: React.FC<HodSyllabusEditorProps> = ({ courseVers
                         const val = coPo?.po?.[`PO${i+1}`] || 0;
                         return (
                           <td key={i} style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', fontWeight: val > 0 ? 700 : 400 }}>
-                            {val > 0 ? val : ''}
+                            {val > 0 ? val : '-'}
                           </td>
                         );
                       })}
@@ -870,7 +870,7 @@ export const HodSyllabusEditor: React.FC<HodSyllabusEditorProps> = ({ courseVers
                         const val = coPso?.pso?.[pso] || 0;
                         return (
                           <td key={pso} style={{ border: '1px solid #000', padding: '2px 10px', textAlign: 'center', fontWeight: val > 0 ? 700 : 400 }}>
-                            {val > 0 ? val : ''}
+                            {val > 0 ? val : '-'}
                           </td>
                         );
                       })}

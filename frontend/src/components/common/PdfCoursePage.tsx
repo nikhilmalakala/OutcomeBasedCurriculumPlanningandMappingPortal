@@ -49,7 +49,7 @@ const formatCommonTo = (items: string[] = [], fallback: string) => {
 const getMappingValue = (mapping: any, key: string) => {
   const source = mapping instanceof Map ? Object.fromEntries(mapping.entries()) : mapping || {};
   const value = Number(source[key] || 0);
-  return Number.isFinite(value) && value > 0 ? value : '';
+  return Number.isFinite(value) && value > 0 ? value : '-';
 };
 
 const deriveColumns = (mappings: any[] = [], mapKey: 'po' | 'pso', prefix: string, fallbackCount: number) => {

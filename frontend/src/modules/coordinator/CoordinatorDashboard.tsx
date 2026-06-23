@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
+import { useContextStore } from '../../store/contextStore';
+import { CurriculumBookGenerator } from '../../components/common/CurriculumBookGenerator';
 import { 
   LayoutDashboard, BookOpen, Layers, Sparkles, FileSpreadsheet, FileText, 
   Database, BookMarked, CheckSquare, ArrowRightLeft, Eye, Bell, Users, 
@@ -79,6 +81,8 @@ interface CoordinatorDashboardProps {
 export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ activeTab, setActiveTab }) => {
   const { user } = useAuthStore();
   const { setChangePasswordModalOpen } = useUIStore();
+  const { departments, regulations, selectedDepartment, selectedRegulation, setSelectedRegulation } = useContextStore();
+  const [bookViewMode, setBookViewMode] = useState<'directory' | 'view'>('directory');
   
   const [assignedVersions, setAssignedVersions] = useState<any[]>([]);
 
@@ -820,7 +824,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
                         const val = coPo?.po?.[po] || 0;
                         return (
                           <td key={po} style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', fontWeight: val > 0 ? 700 : 400 }}>
-                            {val > 0 ? val : ''}
+                            {val > 0 ? val : '-'}
                           </td>
                         );
                       })}
@@ -856,7 +860,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
                         const val = coPso?.pso?.[pso] || 0;
                         return (
                           <td key={pso} style={{ border: '1px solid #000', padding: '2px 10px', textAlign: 'center', fontWeight: val > 0 ? 700 : 400 }}>
-                            {val > 0 ? val : ''}
+                            {val > 0 ? val : '-'}
                           </td>
                         );
                       })}
@@ -1528,7 +1532,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
     <div className="space-y-6 font-sans">
       
       {/* 1. TOP HEADER BANNER (WORKSPACE CONTROL BAR) */}
-      {activeTab !== 'dashboard' && activeTab !== 'my-courses' && activeTab !== 'profile' && activeTab !== 'reports' && activeTab !== 'work-progress' && activeVersion && (
+      {activeTab !== 'dashboard' && activeTab !== 'my-courses' && activeTab !== 'profile' && activeTab !== 'reports' && activeTab !== 'work-progress' && activeTab !== 'builder' && activeVersion && (
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-premium flex flex-wrap items-center justify-between gap-4 no-print animate-fadeIn">
           <div className="flex items-center gap-3">
             <BookOpen className="w-6 h-6 text-blue-600" />
@@ -1596,7 +1600,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
       )}
 
       {/* 1.1 COURSE COMPLETION READINESS & LOCK WARNING BAR */}
-      {activeTab !== 'dashboard' && activeTab !== 'my-courses' && activeTab !== 'profile' && activeTab !== 'reports' && activeTab !== 'work-progress' && activeVersion && (
+      {activeTab !== 'dashboard' && activeTab !== 'my-courses' && activeTab !== 'profile' && activeTab !== 'reports' && activeTab !== 'work-progress' && activeTab !== 'builder' && activeVersion && (
         <div className="space-y-4 no-print">
           
           {/* Lock Banner */}
@@ -1739,7 +1743,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
       <div className="grid grid-cols-12 gap-6 items-start">
         
         <div className={`transition-all duration-300 ${
-          activeTab === 'dashboard' || activeTab === 'my-courses' || activeTab === 'profile' || activeTab === 'reports' || activeTab === 'work-progress'
+          activeTab === 'dashboard' || activeTab === 'my-courses' || activeTab === 'profile' || activeTab === 'reports' || activeTab === 'work-progress' || activeTab === 'builder'
             ? 'col-span-12' 
             : previewOpen ? 'col-span-7' : 'col-span-12'
         }`}>
@@ -3324,6 +3328,63 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
           )}
 
           {/* ========================================================== */}
+          {/* TAB 14: CURRICULUM BOOK */}
+          {/* ========================================================== */}
+          {activeTab === 'builder' && (
+            <div className="space-y-6 animate-fadeIn">
+              {bookViewMode === 'view' ? (
+                <div className="space-y-4">
+                  <button
+                    onClick={() => setBookViewMode('directory')}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 font-semibold cursor-pointer w-fit"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Directory
+                  </button>
+                  <CurriculumBookGenerator />
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h2 className="text-xl font-extrabold text-slate-800">Curriculum Books Directory</h2>
+                    <p className="text-sm text-slate-500 mt-1">Access the generated curriculum books for your department's regulations.</p>
+                  </div>
+
+                  <div className="space-y-8 animate-fadeIn">
+                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                      <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 mb-4">
+                        {selectedDepartment?.name || 'Your Department'} Regulations
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {regulations.map((reg: any) => (
+                          <div key={reg._id} className="border border-slate-200 rounded-xl p-5 hover:border-blue-300 transition-colors bg-slate-50 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 w-16 h-16 bg-blue-100/50 rounded-bl-full -z-0 group-hover:scale-110 transition-transform"></div>
+                            <h4 className="font-extrabold text-slate-800 text-lg relative z-10">{reg.code}</h4>
+                            <p className="text-xs text-slate-500 font-medium mb-4 relative z-10">Academic Year: {reg.academicYear}</p>
+                            
+                            <div className="flex flex-wrap gap-2 relative z-10">
+                              <button
+                                onClick={() => {
+                                  setSelectedRegulation(reg);
+                                  setBookViewMode('view');
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                View Book
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ========================================================== */}
           {activeTab === 'profile' && (
             <div className="space-y-6 animate-fadeIn">
               {/* Success banner */}
@@ -3634,7 +3695,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
         </div>
 
         {/* RIGHT LIVE SYLLABUS DOCUMENT PREVIEW CONTAINER (COLLAPSIBLE SIDE-BY-SIDE SPLIT) */}
-        {activeTab !== 'dashboard' && activeTab !== 'my-courses' && activeTab !== 'profile' && activeTab !== 'reports' && activeTab !== 'work-progress' && activeTab !== 'preview' && activeVersion && previewOpen && (
+        {activeTab !== 'dashboard' && activeTab !== 'my-courses' && activeTab !== 'profile' && activeTab !== 'reports' && activeTab !== 'work-progress' && activeTab !== 'builder' && activeTab !== 'preview' && activeVersion && previewOpen && (
           <div className="col-span-5 bg-slate-300 border border-slate-300 rounded-xl shadow-premium overflow-hidden flex flex-col h-[750px] no-print animate-fadeIn sticky top-6">
             
             {/* Preview Toolbar */}
@@ -3657,7 +3718,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({ acti
       {/* ============================================================== */}
       {/* 3. STICKY BOTTOM ACTIONS CONTROL BAR */}
       {/* ============================================================== */}
-      {activeTab !== 'dashboard' && activeTab !== 'my-courses' && activeTab !== 'profile' && activeTab !== 'reports' && activeTab !== 'work-progress' && activeVersion && (
+      {activeTab !== 'dashboard' && activeTab !== 'my-courses' && activeTab !== 'profile' && activeTab !== 'reports' && activeTab !== 'work-progress' && activeTab !== 'builder' && activeVersion && (
         <div className="bg-white p-4 border-t border-slate-200 shadow-premium flex items-center justify-between no-print sticky bottom-0 z-10 rounded-t-2xl animate-fadeIn">
           <button
             onClick={() => setActiveTab('my-courses')}

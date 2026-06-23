@@ -148,6 +148,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, acti
           { id: 'syllabus', name: 'Syllabus Management', icon: FileText },
           { id: 'reports', name: 'Reports', icon: FileText },
           { id: 'work-progress', name: 'Work Progress', icon: BarChart3 },
+          { id: 'builder', name: 'Curriculum Book', icon: BookMarked },
           { id: 'profile', name: 'Profile', icon: User },
         ];
       case 'Faculty':

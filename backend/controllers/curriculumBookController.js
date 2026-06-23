@@ -187,7 +187,7 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 const getMapValue = (mapping, key) => {
   const source = mapping instanceof Map ? Object.fromEntries(mapping.entries()) : mapping || {};
   const value = Number(source[key] || 0);
-  return Number.isFinite(value) && value > 0 ? value : '';
+  return Number.isFinite(value) && value > 0 ? value : '-';
 };
 
 const deriveMappingColumns = (mappings = [], mapKey, prefix, fallbackCount) => {

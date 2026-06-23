@@ -155,11 +155,11 @@ export const generateSyllabusDocx = async (version) => {
                     new TableCell({ children: [new Paragraph({ text: co.coCode })] }),
                     ...Array.from({ length: 12 }, (_, i) => {
                       const v = poMap instanceof Map ? poMap.get(`PO${i+1}`) : poMap[`PO${i+1}`];
-                      return new TableCell({ children: [new Paragraph({ text: v !== undefined ? String(v) : "-" })] });
+                      return new TableCell({ children: [new Paragraph({ text: Number(v) > 0 ? String(v) : "-" })] });
                     }),
                     ...Array.from({ length: 3 }, (_, i) => {
                       const v = psoMap instanceof Map ? psoMap.get(`PSO${i+1}`) : psoMap[`PSO${i+1}`];
-                      return new TableCell({ children: [new Paragraph({ text: v !== undefined ? String(v) : "-" })] });
+                      return new TableCell({ children: [new Paragraph({ text: Number(v) > 0 ? String(v) : "-" })] });
                     })
                   ]
                 });
